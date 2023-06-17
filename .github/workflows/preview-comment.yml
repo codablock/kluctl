@@ -5,7 +5,7 @@ on:
     workflows:
       - preview-run
     types:
-      - completed
+      - requested
 
 jobs:
   preview-comment:
