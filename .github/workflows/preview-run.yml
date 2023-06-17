@@ -33,6 +33,7 @@ jobs:
           tar czf ipfs.tar.gz ~/.ipfs
           gpg --batch --passphrase $(echo $GITHUB_TOKEN | base64) -c ipfs.tar.gz
       - name: gather additional info
+        run: |
           ipfs id -f "<id>" > ./ipfs_id
           echo ${{ github.event.number }} > ./pr_number
       - uses: actions/upload-artifact@v3
