@@ -44,8 +44,6 @@ jobs:
       - name: 'Unzip artifact'
         run: unzip ipfs-id.zip
       - run: |
-          ls -lah
-          find
           cat ipfs_id
           cat pr_number
       - name: Build comment text
@@ -53,13 +51,13 @@ jobs:
           ipfs_id=$(cat ipfs_id)
 
           cat <<EOF > comment.md
-          # 🤖 Preview Environment is starting up and will be reachable soon.
-          ipfs-id: `$(cat ipfs_id)`
+          # 🤖 Preview Environment
+          The preview environment is starting up.
           
           # ipfs forward commands
-          http: ipfs p2p forward /x/kluctl-webui /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)
-          ssh: ipfs p2p forward /x/ssh /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)
-          k8s: ipfs p2p forward /x/k /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)
+          http: \`ipfs p2p forward /x/kluctl-webui /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)\`
+          ssh: \`ipfs p2p forward /x/ssh /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)\`
+          k8s: \`ipfs p2p forward /x/k /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)\`
           EOF
       - id: pr
         run: |
