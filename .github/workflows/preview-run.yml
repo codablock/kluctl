@@ -59,8 +59,10 @@ jobs:
           gpg --batch --passphrase $(echo $GITHUB_TOKEN | base64) -d ipfs.tar.gz.gpg > ipfs.tar.gz
           tar xzf ipfs.tar.gz
           ls -lah 
-          ls -lah .ipfs
-          echo "IPFS_PATH=$(pwd)/.ipfs" >> $GITHUB_ENV
+          find
+          mv home/runner/.ipfs ~/
+          ls -lah ~
+          #echo "IPFS_PATH=$(pwd)/.ipfs" >> $GITHUB_ENV
       # SETUP IPFS
       - name: Install ipfs
         run: |
