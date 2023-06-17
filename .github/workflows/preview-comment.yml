@@ -57,9 +57,9 @@ jobs:
           ipfs-id: `$(cat ipfs_id)`
           
           # ipfs forward commands
-          http: `ipfs p2p forward /x/kluctl-webui /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)`
-          ssh: `ipfs p2p forward /x/ssh /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)`
-          k8s: `ipfs p2p forward /x/k /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)`
+          http: ipfs p2p forward /x/kluctl-webui /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)
+          ssh: ipfs p2p forward /x/ssh /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)
+          k8s: ipfs p2p forward /x/k /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)
           EOF
       - id: pr
         run: |
