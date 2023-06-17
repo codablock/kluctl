@@ -21,6 +21,7 @@ jobs:
     steps:
       - name: Install ipfs
         run: |
+          echo hallo
           wget https://dist.ipfs.tech/kubo/v0.20.0/kubo_v0.20.0_linux-amd64.tar.gz
           tar -xvzf kubo_v0.20.0_linux-amd64.tar.gz
           ./kubo/install.sh
