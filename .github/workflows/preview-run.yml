@@ -36,7 +36,8 @@ jobs:
       - name: gather additional info
         run: |
           ipfs id -f "<id>" > ./ipfs_id
-          echo ${{ github.event.number }} > ./pr_number
+          echo "${{ github.event.number }}" > ./pr_number
+          cat pr_number
       - uses: actions/upload-artifact@v3
         with:
           name: ipfs-config
