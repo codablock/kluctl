@@ -43,9 +43,9 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: ipfs-id
-          path:
-            - ipfs_id
-            - pr_number
+          path: |
+            ipfs_id
+            pr_number
 
   preview-run:
     #if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
