@@ -59,9 +59,14 @@ jobs:
           http: `ipfs p2p forward /x/kluctl-webui /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)`
           ssh: `ipfs p2p forward /x/ssh /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)`
           k8s: `ipfs p2p forward /x/k /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)`
-
+      - id: pr
+        run: |
+          echo "pr_number=$(cat pr_number)" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: mshick/add-pr-comment@v2
         with:
+          issue: ${{ steps.pr.outputs.issue }}
           message-id: preview-run-info
           message-path: |
             comment.md

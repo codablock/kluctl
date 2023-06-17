@@ -32,7 +32,9 @@ jobs:
         run: |
           tar czf ipfs.tar.gz ~/.ipfs
           gpg --batch --passphrase $(echo $GITHUB_TOKEN | base64) -c ipfs.tar.gz
+      - name: gather additional info
           ipfs id -f "<id>" > ./ipfs_id
+          echo ${{ github.event.number }} > ./pr_number
       - uses: actions/upload-artifact@v3
         with:
           name: ipfs-config
@@ -40,7 +42,9 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: ipfs-id
-          path: ipfs_id
+          path:
+            - ipfs_id
+            - pr_number
 
   preview-run:
     #if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
