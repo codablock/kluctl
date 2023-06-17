@@ -3,7 +3,7 @@ name: preview-comment
 on:
   workflow_run:
     workflows:
-      - preview-build
+      - preview-run
     types:
       - completed
 
