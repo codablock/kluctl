@@ -62,7 +62,7 @@ jobs:
               echo "receiving failed...retrying..."
               sleep 5
               continue
-            do
+            fi
 
             if ! age -d -i age.key -o info.json info.json.age; then
               echo "decryption failed...retrying..."
