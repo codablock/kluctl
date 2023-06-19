@@ -44,14 +44,14 @@ jobs:
           while true; do
             echo "waiting for IPNS..."
             set +e
-            cid=$(ipfs --timeout 5s name resolve k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe)
+            cid=$(ipfs --timeout 15s name resolve k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe)
             set -e
             if [ "$cid" == "" ]; then
               echo "failed to resolve IPNS name...retrying..."
               sleep 5
               continue
             fi
-            if ! ipfs --timeout 5s cat $cid > ipns.json; then
+            if ! ipfs --timeout 15s cat $cid > ipns.json; then
               echo "failed to get ipns.json...retrying..."
               sleep 5
               continue
