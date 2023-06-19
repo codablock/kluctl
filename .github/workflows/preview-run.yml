@@ -14,7 +14,7 @@ jobs:
       - name: Install some tools
         run: |
           sudo apt update
-          sudo apt install -y nmap # for ncat
+          sudo apt install -y ncat
           wget https://github.com/FiloSottile/age/releases/download/v1.1.1/age-v1.1.1-linux-amd64.tar.gz
           tar xzf age-v1.1.1-linux-amd64.tar.gz
           sudo mv age/age* /usr/bin/
