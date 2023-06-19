@@ -55,7 +55,7 @@ jobs:
         id: info
         run: |
           echo "${{ secrets.KLUCTL_PREVIEW_AGE_KEY }}" > age.key
-          while ! go run ./hack/ipfs-exchange-info -mode receive-info -workflow-run-id ${{ github.event.workflow_run.id }} \
+          while ! go run ./hack/ipfs-exchange-info/ipfs-exchange-info -mode receive-info -workflow-run-id ${{ github.event.workflow_run.id }} \
             --age-key-file age.key --repo-name "${{ github.repository }}" > info.json; do
             sleep 1
           done

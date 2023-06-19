@@ -63,14 +63,14 @@ jobs:
       - name: Resolve IPNS
         id: ipns
         run: |
-          while ! ./hack/ipfs-exchange-info -mode resolve-ipns -ipns-name k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe \
+          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode resolve-ipns -ipns-name k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe \
             -workflow-run-id ${{ github.run_id }} > ipfs_id; do
             sleep 1
           done
       # SEND INFO
       - name: send info
         run: |
-          while ! ./hack/ipfs-exchange-info -mode send-info -workflow-run-id ${{ github.run_id }} \
+          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode send-info -workflow-run-id ${{ github.run_id }} \
             --pr-number ${{ github.event.number }} \
             --age-pub-key age1mypja0mcvg04090amd79zv07atquflnazl0x0uyt7ugqq94ev5yqjxjq50 \
             --ipfs-id $(cat ipfs_id); do
