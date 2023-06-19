@@ -43,7 +43,11 @@ jobs:
         run: |
           while true; do
             echo "waiting for IPNS..."
-            ipfs cat /ipns/k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe > ipns.json
+            if ! ipfs cat /ipns/k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe > ipns.json; then
+              echo "failed to get ipns.json...retrying..."
+              sleep 5
+              continue
+            fi
             echo "ipns.json="
             cat ipns.json
             run_id=$(cat ipns.json | jq '.workflow_run_id' -r)
