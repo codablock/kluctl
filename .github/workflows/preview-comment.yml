@@ -51,7 +51,7 @@ jobs:
           h=$(ipfs add ipns.json -q)
           echo h=$h
           ipfs name publish --key kluctl-preview-comment --ttl 30s /ipfs/$h
-      - name: Wait for info
+      - name: Receive info
         id: info
         run: |
           echo "${{ secrets.KLUCTL_PREVIEW_AGE_KEY }}" > age.key
