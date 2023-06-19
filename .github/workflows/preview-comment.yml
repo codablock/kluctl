@@ -18,6 +18,9 @@ jobs:
   preview-comment:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
