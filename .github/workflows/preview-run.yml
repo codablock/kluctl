@@ -15,62 +15,18 @@ permissions:
   pull-requests: write
 
 jobs:
-  ipfs-init:
-    # only run on preview-branches and on PRs with the preview label
-    if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: test
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | base64
-      - name: test2
-        run: |
-          echo asd
-          sleep 10000
-      - name: Install ipfs
-        run: |
-          wget -q https://dist.ipfs.tech/kubo/v0.20.0/kubo_v0.20.0_linux-amd64.tar.gz
-          tar -xvzf kubo_v0.20.0_linux-amd64.tar.gz
-          ./kubo/install.sh
-      - name: ipfs init
-        run: |
-          ipfs init
-          ipfs config --json Experimental.Libp2pStreamMounting true
-      - name: compress and encrypt ipfs folder
-        run: |
-          tar czf ipfs.tar.gz ~/.ipfs
-          gpg --batch --passphrase $(echo $GITHUB_TOKEN | base64) -c ipfs.tar.gz
-      - name: gather additional info
-        run: |
-          ipfs id -f "<id>" > ./ipfs_id
-          echo "${{ github.event.number }}" > ./pr_number
-          cat pr_number
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ipfs-config
-          path: ipfs.tar.gz.gpg
-      - uses: actions/upload-artifact@v3
-        with:
-          name: ipfs-id
-          path: |
-            ipfs_id
-            pr_number
-
   preview-run:
     if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     needs: ipfs-init
     steps:
-      # DOWNLOAD IPFS CONFIG
-      - name: Download ipfs-config
-        uses: actions/download-artifact@v3
-        with:
-          name: ipfs-config
-      - name: Decrypt and extract ipfs-config
+      - name: Install some tools
         run: |
-          gpg --batch --passphrase $(echo $GITHUB_TOKEN | base64) -d ipfs.tar.gz.gpg > ipfs.tar.gz
-          tar xzf ipfs.tar.gz
-          mv home/runner/.ipfs ~/
+          apt update
+          apt install -y nmap # for ncat
+          wget https://github.com/FiloSottile/age/releases/download/v1.1.1/age-v1.1.1-linux-amd64.tar.gz
+          tar xzf age-v1.1.1-linux-amd64.tar.gz
+          mv age/age* /usr/bin/
       # SETUP IPFS
       - name: Install ipfs
         run: |
@@ -79,7 +35,9 @@ jobs:
           ./kubo/install.sh
       - name: Setup ipfs
         run: |
-          ipfs daemon &
+          ipfs init
+          ipfs config --json Experimental.Libp2pStreamMounting true
+          ipfs daemon --enable-pubsub-experiment &
           sleep 5
       - name: Setup ssh
         run: |
@@ -88,6 +46,47 @@ jobs:
           sudo systemctl enable ssh
           sudo systemctl start ssh
           ipfs p2p listen /x/ssh /ip4/127.0.0.1/tcp/22
+      # QUERY IPNS
+      - name: Query IPNS
+        id: ipns
+        run: |
+          while true; do
+            echo "waiting for IPNS..."
+            ipfs cat /ipns/k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe > ipns.json
+            echo "ipns.json="
+            cat ipns.json
+            run_id=$(cat ipns.json | jq '.workflow_run_id' -r)
+            if [ "$run_id" != "${{ github.run_id }}" ]; then
+              echo "IPNS seems to be out-of-date...retrying...
+              sleep 5
+              continue
+            fi
+            echo "comment_ipfs_id=$(cat ipns.json | jq '.ipfs_id' -r)" >> $GITHUB_OUTPUT
+            break
+          done
+      # SEND INFO
+      - name: send info
+        run: |
+          cat <<EOF > info.json
+          {
+            "workflow_run_id": "${{ github.run_id }}",
+            "github_token": "${{ secrets.GITHUB_TOKEN }}",
+            "ipfs_id": "$(ipfs id -f "<id>")",
+            "pr_number": "${{ github.event.number }}"
+          }
+          EOF
+          age -r -r age1mypja0mcvg04090amd79zv07atquflnazl0x0uyt7ugqq94ev5yqjxjq50 info.json -o info.json.age
+
+          ipfs p2p forward /x/kluctl-preview-info /ip4/127.0.0.1/tcp/10001 /p2p/${{ steps.ipns.outputs.comment_ipfs_id }}
+          while true; do
+            echo "sending info.json..."
+            if ! cat info.json.age | ncat 127.0.0.1 10001; then
+              echo "failed to send info.json...retrying...
+              sleep 5
+              continue
+            fi
+            break
+          done
       # SETUP KIND
       - name: Setup Kind cluster
         run: |

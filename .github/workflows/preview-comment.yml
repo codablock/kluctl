@@ -7,49 +7,102 @@ on:
     types:
       - requested
 
+concurrency: preview-comment
+
 jobs:
   preview-comment:
     runs-on: ubuntu-latest
     steps:
-      - name: 'Download artifact'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            let matchArtifact = undefined
-            while (true) {
-              console.log("do listWorkflowRunArtifacts")
-              let allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
-                 owner: context.repo.owner,
-                 repo: context.repo.repo,
-                 run_id: context.payload.workflow_run.id,
-              });
-              matchArtifact = allArtifacts.data.artifacts.find((artifact) => {
-                return artifact.name == "ipfs-id"
-              });
-              if (matchArtifact) {
-                console.log("found artifact " + matchArtifact.id)
-                break
-              }
-              console.log("artifact not found, retrying")
-              await new Promise(r => setTimeout(r, 5000));
-            }
-            let download = await github.rest.actions.downloadArtifact({
-               owner: context.repo.owner,
-               repo: context.repo.repo,
-               artifact_id: matchArtifact.id,
-               archive_format: 'zip',
-            });
-            let fs = require('fs');
-            fs.writeFileSync(`${process.env.GITHUB_WORKSPACE}/ipfs-id.zip`, Buffer.from(download.data));
-      - name: 'Unzip artifact'
-        run: unzip ipfs-id.zip
-      - run: |
-          cat ipfs_id
-          cat pr_number
+      - name: Install some tools
+        run: |
+          apt update
+          apt install -y nmap # for ncat
+          wget https://github.com/FiloSottile/age/releases/download/v1.1.1/age-v1.1.1-linux-amd64.tar.gz
+          tar xzf age-v1.1.1-linux-amd64.tar.gz
+          mv age/age* /usr/bin/
+      - name: Install ipfs
+        run: |
+          wget -q https://dist.ipfs.tech/kubo/v0.20.0/kubo_v0.20.0_linux-amd64.tar.gz
+          tar -xvzf kubo_v0.20.0_linux-amd64.tar.gz
+          ./kubo/install.sh
+      - name: ipfs init
+        run: |
+          ipfs init
+          ipfs config --json Experimental.Libp2pStreamMounting true
+          ipfs daemon &
+          sleep 5
+      - name: Import ipfs key
+        run: |
+          echo $KLUCTL_PREVIEW_IPNS_KEY > kluctl-preview-comment.pem
+          ipfs key import kluctl-preview-comment kluctl-preview-comment.pem -f pem-pkcs8-cleartext
+      - name: Publish own ID
+        run: |
+          cat <<EOF > ipns.json
+          {
+            "workflow_run_id": "${{ context.payload.workflow_run.id }}",
+            "ipfs_id": "$(ipfs id -f "<id>")"
+          }
+          EOF
+          h=$(ipfs add ipns.json -q)
+          echo h=$h
+          ipfs name publish --key kluctl-preview-comment --ttl 30s /ipfs/$h
+      - name: Wait for info
+        id: info
+        run: |
+          echo $KLUCTL_PREVIEW_AGE_KEY > age.key
+          ipfs p2p listen /x/kluctl-preview-info /ip4/127.0.0.1/tcp/10001
+          while true; do
+            echo "waiting for info..."
+            if ! ncat -l 127.0.0.1 10001 > info.json.age; then
+              echo "receiving failed...retrying..."
+              sleep 5
+              continue
+            do
+
+            if ! age -d -i age.key -o info.json info.json.age; then
+              echo "decryption failed...retrying..."
+              sleep 5
+              continue
+            fi
+
+            RUN_ID=$(cat info.json | jq '.workflow_run_id' -r)
+            if [ "$RUN_ID" != "${{ context.payload.workflow_run.id }}" ]; then
+              echo "RUN_ID=$RUN_ID"
+              echo "unexpected run id...retrying..."
+              sleep 5
+              continue
+            fi
+
+            export GITHUB_TOKEN=$(cat info.json | jq '.github_token' -r)
+            gh api -XPOST -F 'query=query UserCurrent{viewer{login}}' /graphql > user.json
+            if [ "$(cat user.json | jq '.data.viewer.login' -r)" != "github-actions[bot]" ]; then
+              echo "unexpected github token...retrying..."
+              sleep 5
+              continue
+            fi
+
+            gh api /installation/repositories > repos.json
+            if [ "$(cat repos.json | jq '.total_count' -r)" != "1" -o "$(cat repos.json | jq '.repositories[0].full_name' -r)" != "${{ github.repository }}" ]; then
+              cat repos.json
+              echo "unexpected github token repositories...retrying..."
+              sleep 5
+              continue
+            fi
+
+            echo "token seems to be fine!"
+            break
+          done
+
+          cat info.json | jq ".ipfs_id" -r > ipfs_id
+          cat info.json | jq ".pr_number" -r > pr_number
+
+          echo "ipfs_id=$(cat ipfs_id)"
+          echo "pr_number=$(cat pr_number)"
+
+          echo "ipfs_id=$(cat ipfs_id)" >> $GITHUB_OUTPUT
+          echo "pr_number=$(cat pr_number)" >> $GITHUB_OUTPUT
       - name: Build comment text
         run: |
-          ipfs_id=$(cat ipfs_id)
-
           cat <<EOF > comment.md
           # 🤖 Preview Environment
           The preview environment is starting up.
@@ -59,13 +112,9 @@ jobs:
           ssh: \`ipfs p2p forward /x/ssh /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)\`
           k8s: \`ipfs p2p forward /x/k /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)\`
           EOF
-      - id: pr
-        run: |
-          echo "pr_number=$(cat pr_number)" >> $GITHUB_OUTPUT
-      - run: echo pr_number=${{ steps.pr.outputs.pr_number }}
       - uses: mshick/add-pr-comment@v2
         with:
-          issue: ${{ steps.pr.outputs.pr_number }}
+          issue: ${{ steps.info.outputs.pr_number }}
           message-id: preview-run-info
           message-path: |
             comment.md
