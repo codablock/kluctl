@@ -18,6 +18,10 @@ jobs:
   preview-comment:
     runs-on: ubuntu-latest
     steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.19
       - name: Install some tools
         run: |
           sudo apt update
@@ -42,60 +46,14 @@ jobs:
           ipfs key import kluctl-preview-comment kluctl-preview-comment.pem -f pem-pkcs8-cleartext
       - name: Publish own ID
         run: |
-          cat <<EOF > ipns.json
-          {
-            "workflow_run_id": "${{ github.event.workflow_run.id }}",
-            "ipfs_id": "$(ipfs id -f "<id>")"
-          }
-          EOF
-          h=$(ipfs add ipns.json -q)
-          echo h=$h
-          ipfs name publish --key kluctl-preview-comment --ttl 30s /ipfs/$h
+          go run ./hack/ipfs-exchange-info -mode publish-ipns -workflow-run-id ${{ github.event.workflow_run.id }} --ipns-key kluctl-preview-comment
       - name: Receive info
         id: info
         run: |
           echo "${{ secrets.KLUCTL_PREVIEW_AGE_KEY }}" > age.key
-          ipfs p2p listen /x/kluctl-preview-info /ip4/127.0.0.1/tcp/10001
-          while true; do
-            echo "waiting for info..."
-            if ! ncat -l 127.0.0.1 10001 > info.json.age; then
-              echo "receiving failed...retrying..."
-              sleep 5
-              continue
-            fi
-
-            if ! age -d -i age.key -o info.json info.json.age; then
-              echo "decryption failed...retrying..."
-              sleep 5
-              continue
-            fi
-
-            RUN_ID=$(cat info.json | jq '.workflow_run_id' -r)
-            if [ "$RUN_ID" != "${{ github.event.workflow_run.id }}" ]; then
-              echo "RUN_ID=$RUN_ID"
-              echo "unexpected run id...retrying..."
-              sleep 5
-              continue
-            fi
-
-            export GITHUB_TOKEN=$(cat info.json | jq '.github_token' -r)
-            gh api -XPOST -F 'query=query UserCurrent{viewer{login}}' /graphql > user.json
-            if [ "$(cat user.json | jq '.data.viewer.login' -r)" != "github-actions[bot]" ]; then
-              echo "unexpected github token...retrying..."
-              sleep 5
-              continue
-            fi
-
-            gh api /installation/repositories > repos.json
-            if [ "$(cat repos.json | jq '.total_count' -r)" != "1" -o "$(cat repos.json | jq '.repositories[0].full_name' -r)" != "${{ github.repository }}" ]; then
-              cat repos.json
-              echo "unexpected github token repositories...retrying..."
-              sleep 5
-              continue
-            fi
-
-            echo "token seems to be fine!"
-            break
+          while ! go run ./hack/ipfs-exchange-info -mode receive-info -workflow-run-id ${{ github.event.workflow_run.id }} \
+            --age-key-file age.key --repo-name "${{ github.repository }}" > info.json; do
+            sleep 1
           done
 
           cat info.json | jq ".ipfs_id" -r > ipfs_id
