@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: test
         run: |
-          echo $GITHUB_TOKEN | base64
+          echo ${{ secrets.GITHUB_TOKEN }} | base64
       - name: test2
         run: |
           echo asd
