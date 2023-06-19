@@ -76,7 +76,7 @@ jobs:
             "pr_number": "${{ github.event.number }}"
           }
           EOF
-          age -r age1mypja0mcvg04090amd79zv07atquflnazl0x0uyt7ugqq94ev5yqjxjq50 info.json -o info.json.age
+          age -r age1mypja0mcvg04090amd79zv07atquflnazl0x0uyt7ugqq94ev5yqjxjq50 -o info.json.age info.json
 
           ipfs p2p forward /x/kluctl-preview-info /ip4/127.0.0.1/tcp/10001 /p2p/${{ steps.ipns.outputs.comment_ipfs_id }}
           while true; do
