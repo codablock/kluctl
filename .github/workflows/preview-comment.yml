@@ -44,7 +44,7 @@ jobs:
         run: |
           cat <<EOF > ipns.json
           {
-            "workflow_run_id": "${{ github.workflow_run.id }}",
+            "workflow_run_id": "${{ github.event.workflow_run.id }}",
             "ipfs_id": "$(ipfs id -f "<id>")"
           }
           EOF
@@ -71,7 +71,7 @@ jobs:
             fi
 
             RUN_ID=$(cat info.json | jq '.workflow_run_id' -r)
-            if [ "$RUN_ID" != "${{ github.workflow_run.id }}" ]; then
+            if [ "$RUN_ID" != "${{ github.event.workflow_run.id }}" ]; then
               echo "RUN_ID=$RUN_ID"
               echo "unexpected run id...retrying..."
               sleep 5
