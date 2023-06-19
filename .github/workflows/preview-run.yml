@@ -84,7 +84,7 @@ jobs:
           while true; do
             echo "sending info.json..."
             if ! cat info.json.age | ncat 127.0.0.1 10001; then
-              echo "failed to send info.json...retrying...
+              echo "failed to send info.json...retrying..."
               sleep 5
               continue
             fi
