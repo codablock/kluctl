@@ -10,7 +10,6 @@ jobs:
   preview-run:
     if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
-    needs: ipfs-init
     steps:
       - name: Install some tools
         run: |
