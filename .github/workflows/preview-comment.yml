@@ -15,11 +15,11 @@ jobs:
     steps:
       - name: Install some tools
         run: |
-          apt update
-          apt install -y nmap # for ncat
+          sudo apt update
+          sudo apt install -y nmap # for ncat
           wget https://github.com/FiloSottile/age/releases/download/v1.1.1/age-v1.1.1-linux-amd64.tar.gz
           tar xzf age-v1.1.1-linux-amd64.tar.gz
-          mv age/age* /usr/bin/
+          sudo mv age/age* /usr/bin/
       - name: Install ipfs
         run: |
           wget -q https://dist.ipfs.tech/kubo/v0.20.0/kubo_v0.20.0_linux-amd64.tar.gz
