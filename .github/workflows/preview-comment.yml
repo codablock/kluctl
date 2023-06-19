@@ -38,7 +38,7 @@ jobs:
           sleep 5
       - name: Import ipfs key
         run: |
-          echo $KLUCTL_PREVIEW_IPNS_KEY > kluctl-preview-comment.pem
+          echo "${{ secrets.KLUCTL_PREVIEW_IPNS_KEY }}" | base64 -d > kluctl-preview-comment.pem
           ipfs key import kluctl-preview-comment kluctl-preview-comment.pem -f pem-pkcs8-cleartext
       - name: Publish own ID
         run: |
@@ -54,7 +54,7 @@ jobs:
       - name: Wait for info
         id: info
         run: |
-          echo $KLUCTL_PREVIEW_AGE_KEY > age.key
+          echo "${{ secrets.KLUCTL_PREVIEW_AGE_KEY }}" > age.key
           ipfs p2p listen /x/kluctl-preview-info /ip4/127.0.0.1/tcp/10001
           while true; do
             echo "waiting for info..."
