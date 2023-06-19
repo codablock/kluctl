@@ -50,7 +50,7 @@ jobs:
       - name: Publish own ID
         run: |
           (cd ./hack/ipfs-exchange-info && go build ./)
-          ./hack/ipfs-exchange-info -mode publish-ipns -workflow-run-id ${{ github.event.workflow_run.id }} --ipns-key kluctl-preview-comment
+          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish-ipns -workflow-run-id ${{ github.event.workflow_run.id }} --ipns-key kluctl-preview-comment
       - name: Receive info
         id: info
         run: |
