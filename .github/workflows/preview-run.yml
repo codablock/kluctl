@@ -48,7 +48,7 @@ jobs:
             cat ipns.json
             run_id=$(cat ipns.json | jq '.workflow_run_id' -r)
             if [ "$run_id" != "${{ github.run_id }}" ]; then
-              echo "IPNS seems to be out-of-date...retrying...
+              echo "IPNS seems to be out-of-date...retrying..."
               sleep 5
               continue
             fi
