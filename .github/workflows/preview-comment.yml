@@ -46,7 +46,8 @@ jobs:
           ipfs key import kluctl-preview-comment kluctl-preview-comment.pem -f pem-pkcs8-cleartext
       - name: Publish own ID
         run: |
-          go run ./hack/ipfs-exchange-info -mode publish-ipns -workflow-run-id ${{ github.event.workflow_run.id }} --ipns-key kluctl-preview-comment
+          (cd ./hack/ipfs-exchange-info && go build ./)
+          ./hack/ipfs-exchange-info -mode publish-ipns -workflow-run-id ${{ github.event.workflow_run.id }} --ipns-key kluctl-preview-comment
       - name: Receive info
         id: info
         run: |
