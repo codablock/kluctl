@@ -76,6 +76,8 @@ jobs:
             --ipfs-id $(cat ipfs_id); do
             sleep 1
           done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # SETUP KIND
       - name: Setup Kind cluster
         run: |
