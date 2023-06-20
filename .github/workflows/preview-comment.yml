@@ -42,7 +42,11 @@ jobs:
           ipfs init
           ipfs config --json Experimental.Libp2pStreamMounting true
           ipfs daemon &
-          sleep 5
+          sleep 1
+          while ! ipfs id &> /dev/null; do
+            echo "waiting for the daemon"
+            sleep 1
+          done
       - name: Import ipfs key
         run: |
           echo "${{ secrets.KLUCTL_PREVIEW_IPNS_KEY }}" | base64 -d > kluctl-preview-comment.pem

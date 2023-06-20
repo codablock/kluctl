@@ -45,7 +45,11 @@ jobs:
           ipfs init
           ipfs config --json Experimental.Libp2pStreamMounting true
           ipfs daemon --enable-pubsub-experiment &
-          sleep 5
+          sleep 1
+          while ! ipfs id &> /dev/null; do
+            echo "waiting for the daemon"
+            sleep 1
+          done
       - name: Setup ssh
         run: |
           mkdir -p ~/.ssh
