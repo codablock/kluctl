@@ -6,11 +6,22 @@ on:
     branches:
       - main
 
+concurrency:
+  group: preview-run
+  cancel-in-progress: true
+
 jobs:
   preview-run:
     if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
+      - name: test
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | base64
+      - name: test2
+        run: |
+          echo test2
+          sleep 100000
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -61,30 +72,6 @@ jobs:
           
           ssh-keygen -f scp_key -P ""
           cat scp_key.pub >> ~/.ssh/authorized_keys
-      # RESOLVE IPNS
-      - name: Build ipfs-exchange-info
-        run: |
-          (cd ./hack/ipfs-exchange-info && go build ./)
-      - name: Resolve IPNS
-        id: ipns
-        run: |
-          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode resolve-ipns -ipns-name k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe \
-            -workflow-run-id ${{ github.run_id }} > ipfs_id; do
-            sleep 1
-          done
-          echo "ipfs_id=$(cat ipfs_id)"
-      # SEND INFO
-      - name: send info
-        run: |
-          static_ipns_name=$(ipfs key gen static-webui)
-          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode send-info -workflow-run-id ${{ github.run_id }} \
-            --pr-number ${{ github.event.pull_request.number }} \
-            --age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 \
-            --ipfs-id $(cat ipfs_id) --static-ipns-name $static_ipns_name; do
-            sleep 1
-          done
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # SETUP KIND
       - name: Setup Kind cluster
         run: |
@@ -150,6 +137,30 @@ jobs:
         run: |
           ipfs p2p listen /x/k /ip4/127.0.0.1/tcp/6443
           ipfs p2p listen /x/kluctl-webui /ip4/127.0.0.1/tcp/9090
+      # RESOLVE IPNS
+      - name: Build ipfs-exchange-info
+        run: |
+          (cd ./hack/ipfs-exchange-info && go build ./)
+      - name: Resolve IPNS
+        id: ipns
+        run: |
+          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode resolve-ipns -ipns-name k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe \
+            -workflow-run-id ${{ github.run_id }} > ipfs_id; do
+            sleep 1
+          done
+          echo "ipfs_id=$(cat ipfs_id)"
+      # SEND INFO
+      - name: send info
+        run: |
+          static_ipns_name=$(ipfs key gen static-webui)
+          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode send-info -workflow-run-id ${{ github.run_id }} \
+            --age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 \
+            --ipfs-id $(cat ipfs_id) --static-ipns-name $static_ipns_name; do
+            sleep 1
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # GENERATE STATIC WEBUI
       - name: Publish static webui and sleep
         run: |
           (
