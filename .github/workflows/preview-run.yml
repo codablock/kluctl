@@ -130,19 +130,10 @@ jobs:
         run: |
           ipfs p2p listen /x/k /ip4/127.0.0.1/tcp/6443
           ipfs p2p listen /x/kluctl-webui /ip4/127.0.0.1/tcp/9090
-      # RESOLVE IPNS
+      # SEND INFO
       - name: Build ipfs-exchange-info
         run: |
           (cd ./hack/ipfs-exchange-info && go build ./)
-      - name: Resolve IPNS
-        id: ipns
-        run: |
-          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode resolve-ipns -ipns-name k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe \
-            -workflow-run-id ${{ github.run_id }} > ipfs_id; do
-            sleep 1
-          done
-          echo "ipfs_id=$(cat ipfs_id)"
-      # SEND INFO
       - name: send info
         run: |
           static_ipns_name=$(ipfs key gen static-webui)
