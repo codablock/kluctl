@@ -77,6 +77,8 @@ func main() {
 	if err != nil {
 		fmt.Print(err)
 		os.Exit(1)
+	} else {
+		os.Exit(0)
 	}
 }
 
@@ -275,10 +277,14 @@ func doReceive(node *rpc.HttpApi) error {
 		return fmt.Errorf("%d is not the expected (%d) workflow run id", info.WorkflowRunId, workflowRunId)
 	}
 
+	log.Info("Checking Github token...")
+
 	err = checkGithubToken(ctx, info.GithubToken)
 	if err != nil {
 		return err
 	}
+
+	log.Info("Done checking Github token...")
 
 	info.GithubToken = ""
 
