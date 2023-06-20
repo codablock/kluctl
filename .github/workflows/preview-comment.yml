@@ -66,8 +66,8 @@ jobs:
             sleep 1
           done
 
-          cat info.json | jq ".ipfs_id" -r > ipfs_id
-          cat info.json | jq ".pr_number" -r > pr_number
+          cat info.json | jq ".ipfsId" -r > ipfs_id
+          cat info.json | jq ".prNumber" -r > pr_number
 
           echo "ipfs_id=$(cat ipfs_id)"
           echo "pr_number=$(cat pr_number)"
