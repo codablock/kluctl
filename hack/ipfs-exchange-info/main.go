@@ -331,6 +331,8 @@ func doGithubRequest(ctx context.Context, method string, url string, body string
 }
 
 func checkGithubToken(ctx context.Context, token string) error {
+	log.Info("asd: ", token)
+
 	body := fmt.Sprintf(`{"query": "query UserCurrent{viewer{login}}"}`)
 	b, err := doGithubRequest(ctx, "POST", "https://api.github.com/graphql", body, token)
 	if err != nil {
