@@ -33,7 +33,7 @@ var agePubKey string
 var repoName string
 
 func ParseFlags() error {
-	flag.DurationVar(&timeout, "timeout", time.Second*10, "Timeout")
+	flag.DurationVar(&timeout, "timeout", time.Second*60, "Timeout")
 	flag.StringVar(&modeFlag, "mode", "", "Mode")
 	flag.StringVar(&ipnsKey, "ipns-key", "", "IPNS key name")
 	flag.StringVar(&ipnsName, "ipns-name", "", "IPNS name")
@@ -300,7 +300,7 @@ func doReceive(node *rpc.HttpApi) error {
 func doGithubRequest(ctx context.Context, method string, url string, body string) ([]byte, error) {
 	token := os.Getenv("GITHUB_TOKEN")
 
-	log.Info("request: %s %s", method, url)
+	log.Info("request: ", method, url)
 
 	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
