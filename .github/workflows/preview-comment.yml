@@ -121,4 +121,3 @@ jobs:
           message-id: preview-run-info
           message-path: |
             comment.md
-      - name: Wait for preview environment
