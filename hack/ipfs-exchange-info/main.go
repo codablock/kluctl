@@ -75,7 +75,7 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Print(err)
+		log.Error(err)
 		os.Exit(1)
 	} else {
 		os.Exit(0)
@@ -279,7 +279,7 @@ func doReceive(node *rpc.HttpApi) error {
 
 	log.Info("Checking Github token...")
 
-	err = checkGithubToken(ctx)
+	err = checkGithubToken(ctx, info.GithubToken)
 	if err != nil {
 		return err
 	}
@@ -297,9 +297,7 @@ func doReceive(node *rpc.HttpApi) error {
 	return nil
 }
 
-func doGithubRequest(ctx context.Context, method string, url string, body string) ([]byte, error) {
-	token := os.Getenv("GITHUB_TOKEN")
-
+func doGithubRequest(ctx context.Context, method string, url string, body string, token string) ([]byte, error) {
 	log.Info("request: ", method, url)
 
 	req, err := http.NewRequest(method, url, strings.NewReader(body))
@@ -332,9 +330,9 @@ func doGithubRequest(ctx context.Context, method string, url string, body string
 	return b, nil
 }
 
-func checkGithubToken(ctx context.Context) error {
+func checkGithubToken(ctx context.Context, token string) error {
 	body := fmt.Sprintf(`{"query": "query UserCurrent{viewer{login}}"}`)
-	b, err := doGithubRequest(ctx, "POST", "https://api.github.com/graphql", body)
+	b, err := doGithubRequest(ctx, "POST", "https://api.github.com/graphql", body, token)
 	if err != nil {
 		return err
 	}
@@ -359,7 +357,7 @@ func checkGithubToken(ctx context.Context) error {
 
 	log.Info("Querying repositories...")
 
-	b, err = doGithubRequest(ctx, "GET", "https://api.github.com/installation/repositories", "")
+	b, err = doGithubRequest(ctx, "GET", "https://api.github.com/installation/repositories", "", token)
 	if err != nil {
 		return err
 	}
