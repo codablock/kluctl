@@ -78,7 +78,7 @@ jobs:
         run: |
           cat <<EOF > comment.md
           # 🤖 Preview Environment
-          The preview environment is starting up.
+          The preview environment is starting up and will be available in a few minutes.
           
           # ipfs forward commands
           http: \`ipfs p2p forward /x/kluctl-webui /ip4/127.0.0.1/tcp/9090 /p2p/$(cat ipfs_id)\`

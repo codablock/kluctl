@@ -140,7 +140,7 @@ jobs:
         run: |
           cd install/webui
           ../../bin/kluctl deploy --yes -a kluctl_image=kluctl -a kluctl_version=preview
-          kubectl -n kluctl-system create secret admin-secret --from-literal adminPassword=admin --from-literal secret=dummy
+          kubectl -n kluctl-system create secret generic admin-secret --from-literal adminPassword=admin --from-literal secret=dummy
       - name: Run kubectl port-forward
         run: |
           kubectl -n kluctl-system port-forward svc/kluctl-webui 9090:8080 &
