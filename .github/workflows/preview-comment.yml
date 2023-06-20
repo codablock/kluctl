@@ -15,6 +15,7 @@ concurrency: preview-comment
 
 jobs:
   preview-comment:
+    if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
       - name: Reset PR comment
