@@ -112,3 +112,6 @@ jobs:
           message-id: preview-run-info
           message-path: |
             comment.md
+      - run: |
+          # sleep a little bit so that IPFS forwarded connections have enough time to flush
+          sleep 10
