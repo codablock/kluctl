@@ -67,12 +67,13 @@ jobs:
             -workflow-run-id ${{ github.run_id }} > ipfs_id; do
             sleep 1
           done
+          echo "ipfs_id=$(cat ipfs_id)"
       # SEND INFO
       - name: send info
         run: |
           while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode send-info -workflow-run-id ${{ github.run_id }} \
-            --pr-number ${{ github.event.number }} \
-            --age-pub-key age1mypja0mcvg04090amd79zv07atquflnazl0x0uyt7ugqq94ev5yqjxjq50 \
+            --pr-number ${{ github.event.pull_request.number }} \
+            --age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 \
             --ipfs-id $(cat ipfs_id); do
             sleep 1
           done
