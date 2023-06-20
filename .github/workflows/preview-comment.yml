@@ -85,7 +85,9 @@ jobs:
           
           # Accessing the static preview UI
           This version of the UI is static but updated regularly. The updates will lag quite a lot, as IPFS needs
-          some time to propagate changes. You'd also need to refresh the page to get an update.
+          some time to propagate changes. You'd also need to refresh the page to get an update. This version of the UI
+          is not able to interact with the cluster, due to missing WebSockets support in IPFS. Use IPFS p2p forwarding
+          if you need this.
           
           The public gateway url is: https://ipfs.io/ipns/$(cat static_ipns_name)/index.html
           
