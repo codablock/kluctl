@@ -150,21 +150,24 @@ jobs:
         run: |
           ipfs p2p listen /x/k /ip4/127.0.0.1/tcp/6443
           ipfs p2p listen /x/kluctl-webui /ip4/127.0.0.1/tcp/9090
-      - name: Publish static webui
+      - name: Publish static webui and sleep
         run: |
           (
+            old_cid=""
             while true; do
               rm -rf kluctl-webui-static
               if ./bin/kluctl webui --static-path=kluctl-webui-static; then
                 cid=$(ipfs add -r -Q kluctl-webui-static)
-                ipfs name publish --key static-webui /ipfs/$cid
+                if [ "$cid" != "$old_cid" ]; then
+                  echo "Publishing $cid..."
+                  ipfs name publish --key static-webui /ipfs/$cid || true
+                  old_cid="$cid"
+                fi
               else
                 echo "Building static webui failed"
               fi
-              sleep 10
+              sleep 1
             done
           ) &
-      - name: Sleep
-        run: |
           echo "Sleeping...."
           sleep 1800
