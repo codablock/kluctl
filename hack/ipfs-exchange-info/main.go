@@ -76,9 +76,9 @@ func main() {
 
 	if err != nil {
 		log.Error(err)
-		os.Exit(1)
+		log.Exit(1)
 	} else {
-		os.Exit(0)
+		log.Exit(0)
 	}
 }
 
