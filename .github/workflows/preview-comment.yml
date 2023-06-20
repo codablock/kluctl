@@ -121,3 +121,7 @@ jobs:
           message-id: preview-run-info
           message-path: |
             comment.md
+      - name: Sleep a bit
+        run: |
+          # Sleep a few seconds to give IPFS p2p streams enough time to flush
+          sleep 10
