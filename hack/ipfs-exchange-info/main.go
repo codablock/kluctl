@@ -125,7 +125,7 @@ func doPublishIpns(node *rpc.HttpApi) error {
 
 	log.Info("path: ", pth.String())
 
-	ipnsEntry, err := node.Name().Publish(ctx, pth, options.Name.Key(ipnsKey), options.Name.TTL(30*time.Second))
+	ipnsEntry, err := node.Name().Publish(ctx, pth, options.Name.Key(ipnsKey), options.Name.TTL(10*time.Second))
 	if err != nil {
 		return err
 	}
@@ -387,18 +387,17 @@ func checkGithubToken(ctx context.Context, token string) error {
 }
 
 func p2pSendFile(ctx context.Context, node *rpc.HttpApi, ipfsId string, data []byte) error {
+	// close the old one
+	_, _ = node.Request("p2p/close").
+		Option("protocol", "/x/kluctl-preview-info").
+		Option("listen-address", "/ip4/127.0.0.1/tcp/10001").
+		Send(ctx)
+
 	_, err := node.Request("p2p/forward", "/x/kluctl-preview-info", "/ip4/127.0.0.1/tcp/10001", fmt.Sprintf("/p2p/%s", ipfsId)).
 		Send(ctx)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_, err := node.Request("p2p/close").
-			Option("protocol", "/x/kluctl-preview-info").
-			Option("listen-address", "/ip4/127.0.0.1/tcp/10001").
-			Send(ctx)
-		_ = err
-	}()
 
 	c, err := net.Dial("tcp", "127.0.0.1:10001")
 	if err != nil {
@@ -436,18 +435,16 @@ func p2pReceiveFile(ctx context.Context, node *rpc.HttpApi) ([]byte, error) {
 
 	targetAddr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", addr.Port)
 
+	// close the old one
+	_, _ = node.Request("p2p/close").
+		Option("protocol", "/x/kluctl-preview-info").
+		Option("target-address", targetAddr).
+		Send(ctx)
 	_, err = node.Request("p2p/listen", "/x/kluctl-preview-info", targetAddr).
 		Send(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_, err := node.Request("p2p/close").
-			Option("protocol", "/x/kluctl-preview-info").
-			Option("target-address", targetAddr).
-			Send(ctx)
-		_ = err
-	}()
 
 	c, err := l.Accept()
 	if err != nil {
