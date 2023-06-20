@@ -279,7 +279,7 @@ func doReceive(node *rpc.HttpApi) error {
 
 	log.Info("Checking Github token...")
 
-	err = checkGithubToken(ctx, info.GithubToken)
+	err = checkGithubToken(ctx)
 	if err != nil {
 		return err
 	}
@@ -297,30 +297,48 @@ func doReceive(node *rpc.HttpApi) error {
 	return nil
 }
 
-func checkGithubToken(ctx context.Context, token string) error {
-	body := fmt.Sprintf(`{"query": "query UserCurrent{viewer{login}}"}`)
-	req, err := http.NewRequest("POST", "https://api.github.com/graphql", strings.NewReader(body))
+func doGithubRequest(ctx context.Context, method string, url string, body string) ([]byte, error) {
+	token := os.Getenv("GITHUB_TOKEN")
+
+	log.Info("request: %s %s", method, url)
+
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		log.Error("NewRequest failed: ", err)
+		return nil, err
+	}
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
-	if err != nil {
-		return err
-	}
 	req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		log.Error("Request failed: ", err)
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("http error: %s", resp.Status)
+		log.Error(fmt.Sprintf("Request failed: %d - %v", resp.StatusCode, resp.Status))
+		return nil, fmt.Errorf("http error: %s", resp.Status)
 	}
 
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Error("Failed to read body: ", err)
+		return nil, err
+	}
+
+	return b, nil
+}
+
+func checkGithubToken(ctx context.Context) error {
+	body := fmt.Sprintf(`{"query": "query UserCurrent{viewer{login}}"}`)
+	b, err := doGithubRequest(ctx, "POST", "https://api.github.com/graphql", body)
+	if err != nil {
 		return err
 	}
+	log.Info("body=", string(b))
 
 	var r struct {
 		Data struct {
@@ -331,32 +349,21 @@ func checkGithubToken(ctx context.Context, token string) error {
 	}
 	err = json.Unmarshal(b, &r)
 	if err != nil {
+		log.Error("Unmarshal failed: ", err)
 		return err
 	}
 	if r.Data.Viewer.Login != "github-actions[bot]" {
+		log.Error("unexpected response from github")
 		return fmt.Errorf("unexpected response from github")
 	}
 
-	req, err = http.NewRequest("GET", "https://api.github.com/installation/repositories", nil)
-	req = req.WithContext(ctx)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
+	log.Info("Querying repositories...")
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("http error: %s", resp.Status)
-	}
-
-	b, err = io.ReadAll(resp.Body)
+	b, err = doGithubRequest(ctx, "GET", "https://api.github.com/installation/repositories", "")
 	if err != nil {
 		return err
 	}
+	log.Info("body=", string(b))
 
 	var r2 struct {
 		Repositories []struct {
