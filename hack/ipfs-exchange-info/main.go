@@ -27,8 +27,7 @@ var ipnsKey string
 var ipnsName string
 var ipfsId string
 var staticIpnsName string
-var workflowRunId int
-var prNumber string
+var prNumber int
 var ageKeyFile string
 var agePubKey string
 var repoName string
@@ -39,9 +38,8 @@ func ParseFlags() error {
 	flag.StringVar(&ipnsKey, "ipns-key", "", "IPNS key name")
 	flag.StringVar(&ipnsName, "ipns-name", "", "IPNS name")
 	flag.StringVar(&staticIpnsName, "static-ipns-name", "", "Static Webui IPNS name")
-	flag.IntVar(&workflowRunId, "workflow-run-id", 0, "Workflow run id")
+	flag.IntVar(&prNumber, "pr-number", 0, "PR number")
 	flag.StringVar(&ipfsId, "ipfs-id", "", "IPFS id")
-	flag.StringVar(&prNumber, "pr-number", "", "PR number")
 	flag.StringVar(&ageKeyFile, "age-key-file", "", "AGE key file")
 	flag.StringVar(&agePubKey, "age-pub-key", "", "AGE pubkey")
 	flag.StringVar(&repoName, "repo-name", "", "Repo name")
@@ -85,16 +83,15 @@ func main() {
 }
 
 type ipnsInfo struct {
-	WorkflowRunId int    `json:"workflowRunId"`
-	IpfsId        string `json:"ipfsId"`
+	PrNumber int    `json:"prNumber"`
+	IpfsId   string `json:"ipfsId"`
 }
 
 type workflowInfo struct {
-	WorkflowRunId  int    `json:"workflowRunId"`
+	PrNumber       int    `json:"prNumber"`
 	IpfsId         string `json:"ipfsId"`
 	StaticIpnsName string `json:"staticIpnsName"`
 	GithubToken    string `json:"githubToken"`
-	PrNumber       string `json:"prNumber"`
 }
 
 func doPublishIpns(node *rpc.HttpApi) error {
@@ -107,8 +104,8 @@ func doPublishIpns(node *rpc.HttpApi) error {
 	}
 
 	info := ipnsInfo{
-		WorkflowRunId: workflowRunId,
-		IpfsId:        selfKey.ID().String(),
+		PrNumber: prNumber,
+		IpfsId:   selfKey.ID().String(),
 	}
 	b, err := json.Marshal(&info)
 	if err != nil {
@@ -172,7 +169,7 @@ func doResolve(node *rpc.HttpApi) error {
 
 	log.Info("IPNS Info: ", string(b))
 
-	if info.WorkflowRunId != workflowRunId {
+	if info.PrNumber != prNumber {
 		return fmt.Errorf("IPNS entry not up-to-date")
 	}
 
@@ -193,11 +190,10 @@ func doSend(node *rpc.HttpApi) error {
 	}
 
 	info := workflowInfo{
-		WorkflowRunId:  workflowRunId,
+		PrNumber:       prNumber,
 		GithubToken:    os.Getenv("GITHUB_TOKEN"),
 		IpfsId:         selfKey.ID().String(),
 		StaticIpnsName: staticIpnsName,
-		PrNumber:       prNumber,
 	}
 
 	b, err := json.Marshal(&info)
@@ -277,8 +273,8 @@ func doReceive(node *rpc.HttpApi) error {
 		return err
 	}
 
-	if info.WorkflowRunId != workflowRunId {
-		return fmt.Errorf("%d is not the expected (%d) workflow run id", info.WorkflowRunId, workflowRunId)
+	if info.PrNumber != prNumber {
+		return fmt.Errorf("%d is not the expected (%d) PR number", info.PrNumber, prNumber)
 	}
 
 	log.Info("Checking Github token...")

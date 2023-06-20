@@ -1,11 +1,10 @@
 name: preview-comment
 
 on:
-  workflow_run:
-    workflows:
-      - preview-run
-    types:
-      - requested
+  pull_request_target:
+    types: [labeled, synchronize]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -18,9 +17,20 @@ jobs:
   preview-comment:
     runs-on: ubuntu-latest
     steps:
+      - name: Reset PR comment
+        uses: mshick/add-pr-comment@v2
+        with:
+          issue: ${{ github.pull_request.number }}
+          message-id: preview-run-info
+          message: |
+            # 🤖 Preview Environment
+            The preview environment is starting up and will be available soon.
       - uses: actions/checkout@v2
         with:
-          ref: ${{ github.event.workflow_run.head_branch }}
+          # Warning, do not try to checkout the base branch here as it would introduce enormous security risks!
+          # Also don't introduce a cache in this workflow!
+          ref: main
+          fetch-depth: 0
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -57,31 +67,26 @@ jobs:
           (cd ./hack/ipfs-exchange-info && go build ./)
       - name: Publish own ID
         run: |
-          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish-ipns -workflow-run-id ${{ github.event.workflow_run.id }} --ipns-key kluctl-preview-comment
+          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish-ipns --ipns-key kluctl-preview-comment -pr-number ${{ github.event.pull_request.number }}
       - name: Receive info
         id: info
         run: |
           echo "${{ secrets.KLUCTL_PREVIEW_AGE_KEY }}" > age.key
-          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode receive-info -workflow-run-id ${{ github.event.workflow_run.id }} \
-            --age-key-file age.key --repo-name "${{ github.repository }}" > info.json; do
+          while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode receive-info \
+            --age-key-file age.key --repo-name "${{ github.repository }}" -pr-number ${{ github.event.pull_request.number }} > info.json; do
             sleep 1
           done
 
           cat info.json | jq ".ipfsId" -r > ipfs_id
           cat info.json | jq ".staticIpnsName" -r > static_ipns_name
-          cat info.json | jq ".prNumber" -r > pr_number
 
           echo "ipfs_id=$(cat ipfs_id)"
           echo "static_ipns_name=$(cat static_ipns_name)"
-          echo "pr_number=$(cat pr_number)"
-
-          echo "ipfs_id=$(cat ipfs_id)" >> $GITHUB_OUTPUT
-          echo "pr_number=$(cat pr_number)" >> $GITHUB_OUTPUT
       - name: Build comment text
         run: |
           cat <<EOF > comment.md
           # 🤖 Preview Environment
-          The preview environment is starting up and will be available in a few minutes.
+          The preview environment is running.
           
           # Accessing the static preview UI
           This version of the UI is static but updated regularly. The updates will lag quite a lot, as IPFS needs
@@ -90,6 +95,9 @@ jobs:
           if you need this.
           
           The public gateway url is: https://ipfs.io/ipns/$(cat static_ipns_name)/index.html
+          
+          As an alternative, install and start [IPFS Kubo](https://github.com/ipfs/kubo/) locally
+          and use this URL: http://$(cat static_ipns_name).ipns.localhost:8080/index.html
           
           # Accessing the dynamic preview UI
           First, install and start [IPFS Kubo](https://github.com/ipfs/kubo/) locally.
@@ -108,10 +116,8 @@ jobs:
           EOF
       - uses: mshick/add-pr-comment@v2
         with:
-          issue: ${{ steps.info.outputs.pr_number }}
+          issue: ${{ github.pull_request.number }}
           message-id: preview-run-info
           message-path: |
             comment.md
-      - run: |
-          # sleep a little bit so that IPFS forwarded connections have enough time to flush
-          sleep 10
+      - name: Wait for preview environment
