@@ -185,5 +185,5 @@ jobs:
               sleep 1
             done
           ) &
-          echo "Sleeping...."
+          echo "Sleeping..."
           sleep 1800
