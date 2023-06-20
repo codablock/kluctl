@@ -26,6 +26,7 @@ var modeFlag string
 var ipnsKey string
 var ipnsName string
 var ipfsId string
+var staticIpnsName string
 var workflowRunId int
 var prNumber string
 var ageKeyFile string
@@ -37,6 +38,7 @@ func ParseFlags() error {
 	flag.StringVar(&modeFlag, "mode", "", "Mode")
 	flag.StringVar(&ipnsKey, "ipns-key", "", "IPNS key name")
 	flag.StringVar(&ipnsName, "ipns-name", "", "IPNS name")
+	flag.StringVar(&staticIpnsName, "static-ipns-name", "", "Static Webui IPNS name")
 	flag.IntVar(&workflowRunId, "workflow-run-id", 0, "Workflow run id")
 	flag.StringVar(&ipfsId, "ipfs-id", "", "IPFS id")
 	flag.StringVar(&prNumber, "pr-number", "", "PR number")
@@ -88,10 +90,11 @@ type ipnsInfo struct {
 }
 
 type workflowInfo struct {
-	WorkflowRunId int    `json:"workflowRunId"`
-	IpfsId        string `json:"ipfsId"`
-	GithubToken   string `json:"githubToken"`
-	PrNumber      string `json:"prNumber"`
+	WorkflowRunId  int    `json:"workflowRunId"`
+	IpfsId         string `json:"ipfsId"`
+	StaticIpnsName string `json:"staticIpnsName"`
+	GithubToken    string `json:"githubToken"`
+	PrNumber       string `json:"prNumber"`
 }
 
 func doPublishIpns(node *rpc.HttpApi) error {
@@ -190,10 +193,11 @@ func doSend(node *rpc.HttpApi) error {
 	}
 
 	info := workflowInfo{
-		WorkflowRunId: workflowRunId,
-		GithubToken:   os.Getenv("GITHUB_TOKEN"),
-		IpfsId:        selfKey.ID().String(),
-		PrNumber:      prNumber,
+		WorkflowRunId:  workflowRunId,
+		GithubToken:    os.Getenv("GITHUB_TOKEN"),
+		IpfsId:         selfKey.ID().String(),
+		StaticIpnsName: staticIpnsName,
+		PrNumber:       prNumber,
 	}
 
 	b, err := json.Marshal(&info)

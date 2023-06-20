@@ -75,10 +75,11 @@ jobs:
       # SEND INFO
       - name: send info
         run: |
+          static_ipns_name=$(ipfs key gen static-webui)
           while ! ./hack/ipfs-exchange-info/ipfs-exchange-info -mode send-info -workflow-run-id ${{ github.run_id }} \
             --pr-number ${{ github.event.pull_request.number }} \
             --age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 \
-            --ipfs-id $(cat ipfs_id); do
+            --ipfs-id $(cat ipfs_id) --static-ipns-name $static_ipns_name; do
             sleep 1
           done
         env:
@@ -148,6 +149,20 @@ jobs:
         run: |
           ipfs p2p listen /x/k /ip4/127.0.0.1/tcp/6443
           ipfs p2p listen /x/kluctl-webui /ip4/127.0.0.1/tcp/9090
+      - name: Publish static webui
+        run: |
+          (
+            while true; do
+              rm -rf kluctl-webui-static
+              if kluctl webui --static-path=kluctl-webui-static; then
+                cid=$(ipfs add -r -Q kluctl-webui-static)
+                ipfs name publish --key static-webui /ipfs/$cid
+              else
+                echo "Building static webui failed"
+              fi
+              sleep 10
+            done
+          ) &
       - name: Sleep
         run: |
           echo "Sleeping...."
