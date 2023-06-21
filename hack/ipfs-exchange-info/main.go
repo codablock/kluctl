@@ -21,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/kubo/client/rpc"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -51,7 +50,7 @@ func ParseFlags() error {
 }
 
 func main() {
-	logging.SetLogLevel("*", "INFO")
+	//logging.SetLogLevel("*", "INFO")
 
 	err := ParseFlags()
 	if err != nil {
