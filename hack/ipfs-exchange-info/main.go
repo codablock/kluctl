@@ -406,7 +406,7 @@ func (t *tracer) Trace(evt *holepunch.Event) {
 func main2() {
 	ctx := context.Background()
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableRelay(), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))))
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.DisableRelay(), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))))
 	if err != nil {
 		panic(err)
 	}
