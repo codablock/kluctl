@@ -4,7 +4,6 @@ go 1.20
 
 require (
 	filippo.io/age v1.1.1
-	github.com/ipfs/boxo v0.10.1
 	github.com/ipfs/kubo v0.20.1-0.20230619130733-8bba03d8bf46
 	github.com/libp2p/go-libp2p v0.27.6
 	github.com/libp2p/go-libp2p-kad-dht v0.24.1
@@ -41,6 +40,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
+	github.com/ipfs/boxo v0.10.1 // indirect
 	github.com/ipfs/go-block-format v0.1.2 // indirect
 	github.com/ipfs/go-cid v0.4.1 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect

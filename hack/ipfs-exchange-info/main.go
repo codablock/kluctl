@@ -1,22 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"encoding/gob"
 	"encoding/json"
 	"filippo.io/age"
 	"flag"
 	"fmt"
-	"github.com/ipfs/boxo/coreiface/options"
-	"github.com/ipfs/boxo/files"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	log "github.com/sirupsen/logrus"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -31,27 +26,21 @@ import (
 )
 
 var modeFlag string
-var ipnsKey string
-var ipnsName string
-var ipfsId string
+var topicFlag string
 var staticIpnsName string
 var prNumber int
 var ageKeyFile string
 var agePubKey string
 var repoName string
-var topic string
 
 func ParseFlags() error {
 	flag.StringVar(&modeFlag, "mode", "", "Mode")
-	flag.StringVar(&ipnsKey, "ipns-key", "", "IPNS key name")
-	flag.StringVar(&ipnsName, "ipns-name", "", "IPNS name")
+	flag.StringVar(&topicFlag, "topic", "", "pubsub topic")
 	flag.StringVar(&staticIpnsName, "static-ipns-name", "", "Static Webui IPNS name")
 	flag.IntVar(&prNumber, "pr-number", 0, "PR number")
-	flag.StringVar(&ipfsId, "ipfs-id", "", "IPFS id")
 	flag.StringVar(&ageKeyFile, "age-key-file", "", "AGE key file")
 	flag.StringVar(&agePubKey, "age-pub-key", "", "AGE pubkey")
 	flag.StringVar(&repoName, "repo-name", "", "Repo name")
-	flag.StringVar(&topic, "topic", "", "pubsub topic")
 	flag.Parse()
 
 	return nil
@@ -63,39 +52,37 @@ func main() {
 		panic(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
+
+	// "Connect" to local node
+	ipfsNode, err := rpc.NewLocalApi()
+	if err != nil {
+		log.Error(err)
+		os.Exit(1)
+	}
 
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
 	if err != nil {
 		panic(err)
 	}
-	go discoverPeers(ctx, h)
+	discoverPeers(ctx, h)
 
 	ps, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
 		panic(err)
 	}
-	topic, err := ps.Join(topic)
+	topic, err := ps.Join(topicFlag)
 	if err != nil {
 		panic(err)
 	}
-	go streamConsoleTo(ctx, topic)
 
-	sub, err := topic.Subscribe()
-	if err != nil {
-		panic(err)
+	switch modeFlag {
+	case "publish":
+		err = doPublish(ctx, topic, ipfsNode)
+	case "subsribe":
+		err = doSubscribe(ctx, topic, ipfsNode)
 	}
-	printMessagesFrom(ctx, sub)
-
-	/*switch modeFlag {
-	case "listen-info":
-		err = doListenInfo(node)
-	case "publish-info":
-		err = doPublishInfo(node)
-	default:
-		err = fmt.Errorf("unknown mode %s", modeFlag)
-	}*/
 
 	if err != nil {
 		log.Error(err)
@@ -124,7 +111,7 @@ func initDHT(ctx context.Context, h host.Host) *dht.IpfsDHT {
 		go func() {
 			defer wg.Done()
 			if err := h.Connect(ctx, *peerinfo); err != nil {
-				fmt.Println("Bootstrap warning:", err)
+				log.Info("Bootstrap warning:", err)
 			}
 		}()
 	}
@@ -136,13 +123,13 @@ func initDHT(ctx context.Context, h host.Host) *dht.IpfsDHT {
 func discoverPeers(ctx context.Context, h host.Host) {
 	kademliaDHT := initDHT(ctx, h)
 	routingDiscovery := drouting.NewRoutingDiscovery(kademliaDHT)
-	dutil.Advertise(ctx, routingDiscovery, topic)
+	dutil.Advertise(ctx, routingDiscovery, topicFlag)
 
 	// Look for others who have announced and attempt to connect to them
 	anyConnected := false
 	for !anyConnected {
-		fmt.Println("Searching for peers...")
-		peerChan, err := routingDiscovery.FindPeers(ctx, topic)
+		log.Info("Searching for peers...")
+		peerChan, err := routingDiscovery.FindPeers(ctx, topicFlag)
 		if err != nil {
 			panic(err)
 		}
@@ -152,42 +139,14 @@ func discoverPeers(ctx context.Context, h host.Host) {
 			}
 			err := h.Connect(ctx, peer)
 			if err != nil {
-				fmt.Println("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
+				log.Info("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
 			} else {
-				fmt.Println("Connected to:", peer.ID.Pretty())
+				log.Info("Connected to:", peer.ID.Pretty())
 				anyConnected = true
 			}
 		}
 	}
-	fmt.Println("Peer discovery complete")
-}
-
-func streamConsoleTo(ctx context.Context, topic *pubsub.Topic) {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		s, err := reader.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
-		if err := topic.Publish(ctx, []byte(s)); err != nil {
-			fmt.Println("### Publish error:", err)
-		}
-	}
-}
-
-func printMessagesFrom(ctx context.Context, sub *pubsub.Subscription) {
-	for {
-		m, err := sub.Next(ctx)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(m.ReceivedFrom, ": ", string(m.Message.Data))
-	}
-}
-
-type ipnsInfo struct {
-	PrNumber int    `json:"prNumber"`
-	IpfsId   string `json:"ipfsId"`
+	log.Info("Peer discovery complete")
 }
 
 type workflowInfo struct {
@@ -197,97 +156,8 @@ type workflowInfo struct {
 	GithubToken    string `json:"githubToken"`
 }
 
-func doPublishIpns(node *rpc.HttpApi) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
-
-	selfKey, err := node.Key().Self(ctx)
-	if err != nil {
-		return err
-	}
-
-	info := ipnsInfo{
-		PrNumber: prNumber,
-		IpfsId:   selfKey.ID().String(),
-	}
-	b, err := json.Marshal(&info)
-	if err != nil {
-		return err
-	}
-	log.Info("publishing: ", string(b))
-
-	f := files.NewBytesFile(b)
-
-	pth, err := node.Unixfs().Add(ctx, f)
-	if err != nil {
-		return err
-	}
-
-	log.Info("path: ", pth.String())
-
-	ipnsEntry, err := node.Name().Publish(ctx, pth, options.Name.Key(ipnsKey), options.Name.TTL(10*time.Second))
-	if err != nil {
-		return err
-	}
-
-	log.Info("published as ", ipnsEntry.Name())
-
-	return nil
-}
-
-func doResolve(node *rpc.HttpApi) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	log.Info("Resolving: ", ipnsName)
-
-	resolved, err := node.Name().Resolve(ctx, ipnsName, options.Name.Cache(false))
-	if err != nil {
-		return err
-	}
-
-	log.Info("Resolved to: ", resolved.String())
-
-	nd, err := node.Unixfs().Get(ctx, resolved)
-	if err != nil {
-		return err
-	}
-	defer nd.Close()
-
-	f, ok := nd.(files.File)
-	if !ok {
-		return fmt.Errorf("%s is not a file", resolved.String())
-	}
-
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return err
-	}
-
-	var info ipnsInfo
-	err = json.Unmarshal(b, &info)
-	if err != nil {
-		return err
-	}
-
-	log.Info("IPNS Info: ", string(b))
-
-	if info.PrNumber != prNumber {
-		return fmt.Errorf("IPNS entry not up-to-date")
-	}
-
-	_, err = os.Stdout.WriteString(info.IpfsId + "\n")
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func doSend(node *rpc.HttpApi) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	selfKey, err := node.Key().Self(ctx)
+func doPublish(ctx context.Context, topic *pubsub.Topic, ipfsNode *rpc.HttpApi) error {
+	selfKey, err := ipfsNode.Key().Self(ctx)
 	if err != nil {
 		return err
 	}
@@ -326,7 +196,7 @@ func doSend(node *rpc.HttpApi) error {
 
 	log.Info("Sending info...")
 
-	err = p2pSendFile(ctx, node, ipfsId, b)
+	err = topic.Publish(ctx, b)
 	if err != nil {
 		return err
 	}
@@ -334,22 +204,30 @@ func doSend(node *rpc.HttpApi) error {
 	log.Info("Done sending info.")
 
 	return nil
-
 }
 
-func doReceive(node *rpc.HttpApi) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
-	defer cancel()
-
-	log.Info("Receiving info...")
-
-	b, err := p2pReceiveFile(ctx, node)
+func doSubscribe(ctx context.Context, topic *pubsub.Topic, ipfsNode *rpc.HttpApi) error {
+	sub, err := topic.Subscribe()
 	if err != nil {
 		return err
 	}
 
-	log.Info("Done receiving info.")
+	for {
+		m, err := sub.Next(ctx)
+		if err != nil {
+			return err
+		}
+		log.Info(m.ReceivedFrom, ": ", string(m.Message.Data))
+		err = handleInfo(ctx, m.Message.Data)
+		if err == nil {
+			break
+		}
+		log.Error(err)
+	}
+	return nil
+}
 
+func handleInfo(ctx context.Context, data []byte) error {
 	idsBytes, err := os.ReadFile(ageKeyFile)
 	if err != nil {
 		return err
@@ -358,7 +236,7 @@ func doReceive(node *rpc.HttpApi) error {
 	if err != nil {
 		return err
 	}
-	d, err := age.Decrypt(bytes.NewReader(b), ageIds...)
+	d, err := age.Decrypt(bytes.NewReader(data), ageIds...)
 	if err != nil {
 		return err
 	}
@@ -368,10 +246,10 @@ func doReceive(node *rpc.HttpApi) error {
 	if err != nil {
 		return err
 	}
-	b = w.Bytes()
+	data = w.Bytes()
 
 	var info workflowInfo
-	err = json.Unmarshal(b, &info)
+	err = json.Unmarshal(data, &info)
 	if err != nil {
 		return err
 	}
@@ -391,12 +269,11 @@ func doReceive(node *rpc.HttpApi) error {
 
 	info.GithubToken = ""
 
-	b, err = json.Marshal(&info)
+	data, err = json.Marshal(&info)
 	if err != nil {
 		return err
 	}
-	_, _ = os.Stdout.WriteString(string(b) + "\n")
-
+	_, _ = os.Stdout.WriteString(string(data) + "\n")
 	return nil
 }
 
@@ -483,88 +360,4 @@ func checkGithubToken(ctx context.Context, token string) error {
 	}
 
 	return nil
-}
-
-func p2pSendFile(ctx context.Context, node *rpc.HttpApi, ipfsId string, data []byte) error {
-	// close the old one
-	_, _ = node.Request("p2p/close").
-		Option("protocol", "/x/kluctl-preview-info").
-		Option("listen-address", "/ip4/127.0.0.1/tcp/10001").
-		Send(ctx)
-
-	_, err := node.Request("p2p/forward", "/x/kluctl-preview-info", "/ip4/127.0.0.1/tcp/10001", fmt.Sprintf("/p2p/%s", ipfsId)).
-		Send(ctx)
-	if err != nil {
-		return err
-	}
-
-	c, err := net.Dial("tcp", "127.0.0.1:10001")
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	e := gob.NewEncoder(c)
-	d := gob.NewDecoder(c)
-
-	err = e.Encode(data)
-	if err != nil {
-		return err
-	}
-
-	var ok string
-	err = d.Decode(&ok)
-	if err != nil {
-		return err
-	}
-	if ok != "ok" {
-		return fmt.Errorf("did not receive ok")
-	}
-
-	return nil
-}
-
-func p2pReceiveFile(ctx context.Context, node *rpc.HttpApi) ([]byte, error) {
-	l, err := net.Listen("tcp", "127.0.0.1:10002")
-	if err != nil {
-		return nil, err
-	}
-	defer l.Close()
-	addr := l.Addr().(*net.TCPAddr)
-
-	targetAddr := fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", addr.Port)
-
-	// close the old one
-	_, _ = node.Request("p2p/close").
-		Option("protocol", "/x/kluctl-preview-info").
-		Option("target-address", targetAddr).
-		Send(ctx)
-	_, err = node.Request("p2p/listen", "/x/kluctl-preview-info", targetAddr).
-		Send(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := l.Accept()
-	if err != nil {
-		return nil, err
-	}
-	defer c.Close()
-
-	d := gob.NewDecoder(c)
-	e := gob.NewEncoder(c)
-
-	var data []byte
-	err = d.Decode(&data)
-	if err != nil {
-		return nil, err
-	}
-
-	ok := "ok"
-	err = e.Encode(&ok)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
 }
