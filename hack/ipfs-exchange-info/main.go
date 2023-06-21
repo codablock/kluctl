@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
@@ -23,7 +24,7 @@ import (
 
 	"github.com/ipfs/kubo/client/rpc"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 )
 
 var modeFlag string
@@ -72,11 +73,26 @@ func main() {
 		log.Exit(1)
 	}
 
+	var h host.Host
+	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
+	if err != nil {
+		panic(err)
+	}
+
+	log.Infof("own ID: %s", h.ID().String())
+
+	kademliaDHT, err := initDHT(ctx, h)
+	if err != nil {
+		log.Error(err)
+		log.Exit(1)
+	}
+	discovery := drouting.NewRoutingDiscovery(kademliaDHT)
+
 	switch modeFlag {
 	case "publish":
-		err = doPublish(ctx, ipfsNode)
+		err = doPublish(ctx, h, discovery, ipfsNode)
 	case "subscribe":
-		err = doSubscribe(ctx, ipfsNode)
+		err = doSubscribe(ctx, h, discovery, ipfsNode)
 	default:
 		err = fmt.Errorf("unknown mode %s", modeFlag)
 	}
@@ -112,9 +128,6 @@ func initDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
 			} else {
 				log.Infof("Connected to bootstrap peer: %s", peerinfo.String())
 			}
-
-			protos, _ := h.Peerstore().GetProtocols(peerinfo.ID)
-			log.Info(protos)
 		}()
 	}
 	wg.Wait()
@@ -129,7 +142,7 @@ type workflowInfo struct {
 	GithubToken    string `json:"githubToken"`
 }
 
-func doPublish(ctx context.Context, ipfsNode *rpc.HttpApi) error {
+func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
 	selfKey, err := ipfsNode.Key().Self(ctx)
 	if err != nil {
 		return err
@@ -169,21 +182,6 @@ func doPublish(ctx context.Context, ipfsNode *rpc.HttpApi) error {
 
 	log.Info("Sending info...")
 
-	var h host.Host
-	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
-	if err != nil {
-		panic(err)
-	}
-
-	log.Infof("own ID: %s", h.ID().String())
-
-	kademliaDHT, err := initDHT(ctx, h)
-	if err != nil {
-		log.Error(err)
-		log.Exit(1)
-	}
-	discovery := drouting.NewRoutingDiscovery(kademliaDHT)
-
 	for {
 		peersCh, err := discovery.FindPeers(ctx, topicFlag)
 		if err != nil {
@@ -212,7 +210,8 @@ func doPublish(ctx context.Context, ipfsNode *rpc.HttpApi) error {
 	return nil
 }
 
-func doSubscribe(ctx context.Context, ipfsNode *rpc.HttpApi) error {
+func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
+	dutil.Advertise(ctx, discovery, topicFlag)
 	err := p2pReceiveFiles(ctx, ipfsNode, func(b []byte) error {
 		return handleInfo(ctx, b)
 	})
