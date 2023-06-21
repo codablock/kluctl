@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
@@ -87,10 +88,10 @@ func main() {
 		panic(err)
 	}
 
-	/*reader := bufio.NewReader(os.Stdin)
+	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter num: ")
 	text, _ := reader.ReadString('\n')
-	topicFlag = "my-test-topic-" + strings.TrimSpace(text)*/
+	topicFlag = "my-test-topic-" + strings.TrimSpace(text)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
