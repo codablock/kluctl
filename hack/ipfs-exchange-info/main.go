@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	log "github.com/sirupsen/logrus"
@@ -211,11 +212,36 @@ func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDisc
 }
 
 func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
-	dutil.Advertise(ctx, discovery, topicFlag)
-	err := p2pReceiveFiles(ctx, ipfsNode, func(b []byte) error {
-		return handleInfo(ctx, b)
+	doneCh := make(chan bool)
+	h.SetStreamHandler("/x/kluctl-preview-info", func(s network.Stream) {
+		defer s.Close()
+
+		enc := gob.NewEncoder(s)
+		dec := gob.NewDecoder(s)
+
+		var b []byte
+		err := dec.Decode(&b)
+		if err != nil {
+			log.Infof("Receive failed: %v", err)
+			return
+		}
+
+		err = handleInfo(ctx, b)
+		if err != nil {
+			log.Infof("handle failed: %v", err)
+			return
+		}
+
+		err = enc.Encode("ok")
+		if err != nil {
+			log.Infof("Sending ok failed: %v", err)
+			return
+		}
+		doneCh <- true
 	})
-	return err
+	dutil.Advertise(ctx, discovery, topicFlag)
+	<-doneCh
+	return nil
 }
 
 func handleInfo(ctx context.Context, data []byte) error {
