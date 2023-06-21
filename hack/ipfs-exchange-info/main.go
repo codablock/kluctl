@@ -127,6 +127,7 @@ func main() {
 								ID:    id,
 								Addrs: h.Peerstore().Addrs(id),
 							}
+							sent++
 							break
 						}
 					}
