@@ -62,7 +62,7 @@ func main() {
 		log.Exit(1)
 	}
 
-	h, err := libp2p.New(libp2p.NoListenAddrs, libp2p.EnableRelay())
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
@@ -124,6 +124,8 @@ func initDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
 			defer wg.Done()
 			if err := h.Connect(ctx, *peerinfo); err != nil {
 				log.Info("Bootstrap warning:", err)
+			} else {
+				log.Info("Connected to bootstrap peer: %s", peerinfo.String())
 			}
 		}()
 	}
