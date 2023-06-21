@@ -107,8 +107,10 @@ func main() {
 	}
 
 	var h host.Host
-	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+	h, err = libp2p.New(libp2p.NoListenAddrs,
 		libp2p.ResourceManager(rcm),
+		libp2p.EnableRelay(),
+		libp2p.EnableHolePunching(),
 		libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, num int) <-chan peer.AddrInfo {
 			ch := make(chan peer.AddrInfo)
 			go func() {
