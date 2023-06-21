@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
@@ -105,7 +106,7 @@ func main() {
 		panic(err)
 	}
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))), libp2p.ResourceManager(rcm))
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.ResourceManager(rcm))
 	if err != nil {
 		panic(err)
 	}
@@ -202,7 +203,7 @@ func discoverPeers(ctx context.Context, h host.Host) error {
 			if peer.ID == h.ID() {
 				continue // No self connection
 			}
-			err := h.Connect(ctx, peer)
+			err := h.Connect(network.WithForceDirectDial(ctx, "test"), peer)
 			if err != nil {
 				log.Info("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
 			} else {
@@ -210,9 +211,9 @@ func discoverPeers(ctx context.Context, h host.Host) error {
 				anyConnected = true
 			}
 		}
-		/*if !anyConnected {
+		if !anyConnected {
 			time.Sleep(5 * time.Second)
-		}*/
+		}
 	}
 	log.Info("Peer discovery complete")
 	return nil
