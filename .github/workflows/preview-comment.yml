@@ -72,7 +72,7 @@ jobs:
         id: info
         run: |
           echo "${{ secrets.KLUCTL_PREVIEW_AGE_KEY }}" > age.key
-          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode subscribe -topic -topic kluctl-preview-${{ github.event.pull_request.number }} -pr-number ${{ github.event.pull_request.number }} -repo-name "${{ github.repository }}" -age-key-file age.key  > info.json
+          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode subscribe -topic kluctl-preview-${{ github.event.pull_request.number }} -pr-number ${{ github.event.pull_request.number }} -repo-name "${{ github.repository }}" -age-key-file age.key  > info.json
 
           cat info.json | jq ".ipfsId" -r > ipfs_id
           cat info.json | jq ".staticIpnsName" -r > static_ipns_name
