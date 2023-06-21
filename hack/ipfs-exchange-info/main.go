@@ -70,18 +70,18 @@ func main() {
 
 	log.Infof("own ID: %s", h.ID().String())
 
-	err = discoverPeers(ctx, h)
-	if err != nil {
-		log.Error(err)
-		log.Exit(1)
-	}
-
 	ps, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
 	}
 	topic, err := ps.Join(topicFlag)
+	if err != nil {
+		log.Error(err)
+		log.Exit(1)
+	}
+
+	err = discoverPeers(ctx, h)
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
