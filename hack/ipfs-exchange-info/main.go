@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
@@ -9,7 +8,6 @@ import (
 	"filippo.io/age"
 	"flag"
 	"fmt"
-	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -82,17 +80,17 @@ const limiterCfg = `
 `
 
 func main() {
-	logging.SetLogLevel("*", "INFO")
+	//logging.SetLogLevel("*", "INFO")
 
 	err := ParseFlags()
 	if err != nil {
 		panic(err)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	/*reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter num: ")
 	text, _ := reader.ReadString('\n')
-	topicFlag = "my-test-topic-" + strings.TrimSpace(text)
+	topicFlag = "my-test-topic-" + strings.TrimSpace(text)*/
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -118,7 +116,7 @@ func main() {
 		panic(err)
 	}
 	var h host.Host
-	h, err = libp2p.New(libp2p.NoListenAddrs,
+	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
 		libp2p.ResourceManager(rcm),
 		libp2p.EnableRelay(),
 		libp2p.EnableHolePunching(),
@@ -356,7 +354,7 @@ func doSendInfo(ctx context.Context, h host.Host, id peer.ID, b []byte) error {
 
 func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
 	done := make(chan bool)
-	h.SetStreamHandler("/x/kluctl-/x/kluctl-preview-info", func(s network.Stream) {
+	h.SetStreamHandler("/x/kluctl-preview-info", func(s network.Stream) {
 		defer s.Close()
 
 		enc := gob.NewEncoder(s)
