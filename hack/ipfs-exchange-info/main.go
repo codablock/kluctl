@@ -9,6 +9,7 @@ import (
 	"filippo.io/age"
 	"flag"
 	"fmt"
+	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
@@ -26,6 +27,7 @@ import (
 	"github.com/ipfs/kubo/client/rpc"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
+	mh "github.com/multiformats/go-multihash"
 )
 
 var modeFlag string
@@ -75,7 +77,7 @@ func main() {
 	}
 
 	var h host.Host
-	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
+	h, err = libp2p.New(libp2p.NoListenAddrs)
 	if err != nil {
 		panic(err)
 	}
@@ -93,7 +95,7 @@ func main() {
 	case "publish":
 		err = doPublish(ctx, h, discovery, ipfsNode)
 	case "subscribe":
-		err = doSubscribe(ctx, h, discovery, ipfsNode)
+		err = doSubscribe(ctx, h, kademliaDHT, discovery, ipfsNode)
 	default:
 		err = fmt.Errorf("unknown mode %s", modeFlag)
 	}
@@ -211,7 +213,7 @@ func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDisc
 	return nil
 }
 
-func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
+func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
 	doneCh := make(chan bool)
 	h.SetStreamHandler("/x/kluctl-preview-info", func(s network.Stream) {
 		defer s.Close()
@@ -239,9 +241,25 @@ func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDi
 		}
 		doneCh <- true
 	})
+
+	hash, err := nsToCid(topicFlag)
+	if err != nil {
+		return err
+	}
+
+	//dht.ProviderStore().AddProvider(ctx, hash.Hash())
 	dutil.Advertise(ctx, discovery, topicFlag)
 	<-doneCh
 	return nil
+}
+
+func nsToCid(ns string) (cid.Cid, error) {
+	h, err := mh.Sum([]byte(ns), mh.SHA2_256, -1)
+	if err != nil {
+		return cid.Undef, err
+	}
+
+	return cid.NewCidV1(cid.Raw, h), nil
 }
 
 func handleInfo(ctx context.Context, data []byte) error {
