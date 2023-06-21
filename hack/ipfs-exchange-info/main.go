@@ -106,7 +106,34 @@ func main() {
 		panic(err)
 	}
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.ResourceManager(rcm), libp2p.Relaa())
+	var h host.Host
+	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+		libp2p.ResourceManager(rcm),
+		libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, num int) <-chan peer.AddrInfo {
+			ch := make(chan peer.AddrInfo)
+			go func() {
+				sent := 0
+				for _, id := range h.Peerstore().PeersWithAddrs() {
+					if sent >= num {
+						break
+					}
+					protos, err := h.Peerstore().GetProtocols(id)
+					if err != nil {
+						continue
+					}
+					for _, proto := range protos {
+						if strings.HasPrefix(string(proto), "/libp2p/circuit/relay/") {
+							ch <- peer.AddrInfo{
+								ID:    id,
+								Addrs: h.Peerstore().Addrs(id),
+							}
+							break
+						}
+					}
+				}
+			}()
+			return ch
+		}))
 	if err != nil {
 		panic(err)
 	}
