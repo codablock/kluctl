@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -406,10 +407,49 @@ func (t *tracer) Trace(evt *holepunch.Event) {
 	log.Info(evt)
 }
 
+const limiterCfg = `
+{
+  "System":  {
+    "StreamsInbound": 4096,
+    "StreamsOutbound": 32768,
+    "Conns": 64000,
+    "ConnsInbound": 512,
+    "ConnsOutbound": 32768,
+    "FD": 64000
+  },
+  "Transient": {
+    "StreamsInbound": 4096,
+    "StreamsOutbound": 32768,
+    "ConnsInbound": 512,
+    "ConnsOutbound": 32768,
+    "FD": 64000
+  },
+
+  "ProtocolDefault":{
+    "StreamsInbound": 1024,
+    "StreamsOutbound": 32768
+  },
+
+  "ServiceDefault":{
+    "StreamsInbound": 2048,
+    "StreamsOutbound": 32768
+  }
+}
+`
+
 func main2() {
 	ctx := context.Background()
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))), libp2p.WithDialTimeout(10*time.Second))
+	limiter, err := rcmgr.NewDefaultLimiterFromJSON(strings.NewReader(limiterCfg))
+	if err != nil {
+		panic(err)
+	}
+	rcm, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		panic(err)
+	}
+
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))), libp2p.ResourceManager(rcm))
 	if err != nil {
 		panic(err)
 	}
