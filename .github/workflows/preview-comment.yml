@@ -11,7 +11,9 @@ permissions:
   issues: write
   pull-requests: write
 
-concurrency: preview-comment
+concurrency:
+  group: preview-comment
+  cancel-in-progress: true
 
 jobs:
   preview-comment:
