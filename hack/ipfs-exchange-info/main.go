@@ -8,6 +8,7 @@ import (
 	"filippo.io/age"
 	"flag"
 	"fmt"
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
@@ -80,7 +81,7 @@ const limiterCfg = `
 `
 
 func main() {
-	//logging.SetLogLevel("*", "INFO")
+	logging.SetLogLevel("*", "INFO")
 
 	err := ParseFlags()
 	if err != nil {
@@ -111,12 +112,19 @@ func main() {
 		panic(err)
 	}
 
+	relayServer, err := peer.AddrInfoFromP2pAddr(dht.DefaultBootstrapPeers[len(dht.DefaultBootstrapPeers)-1])
+	if err != nil {
+		panic(err)
+	}
 	var h host.Host
 	h, err = libp2p.New(libp2p.NoListenAddrs,
 		libp2p.ResourceManager(rcm),
 		libp2p.EnableRelay(),
 		libp2p.EnableHolePunching(),
-		libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, num int) <-chan peer.AddrInfo {
+		libp2p.EnableAutoRelayWithStaticRelays([]peer.AddrInfo{
+			*relayServer,
+		}),
+		/*libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, num int) <-chan peer.AddrInfo {
 			ch := make(chan peer.AddrInfo)
 			go func() {
 				sent := 0
@@ -142,7 +150,7 @@ func main() {
 				close(ch)
 			}()
 			return ch
-		}))
+		})*/)
 	if err != nil {
 		panic(err)
 	}
