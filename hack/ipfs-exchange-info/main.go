@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/gob"
 	"encoding/json"
 	"filippo.io/age"
 	"flag"
@@ -11,6 +12,7 @@ import (
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
@@ -24,7 +26,6 @@ import (
 
 	"github.com/ipfs/kubo/client/rpc"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 )
@@ -157,29 +158,18 @@ func main() {
 
 	log.Infof("own ID: %s", h.ID().String())
 
-	go func() {
-		err := discoverPeers(ctx, h)
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	ps, err := pubsub.NewGossipSub(ctx, h)
+	kademliaDHT, err := initDHT(ctx, h)
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
 	}
-	topic, err := ps.Join(topicFlag)
-	if err != nil {
-		log.Error(err)
-		log.Exit(1)
-	}
+	routingDiscovery := drouting.NewRoutingDiscovery(kademliaDHT)
 
 	switch modeFlag {
 	case "publish":
-		err = doPublish(ctx, topic, ipfsNode)
+		err = doPublish(ctx, h, routingDiscovery, ipfsNode)
 	case "subscribe":
-		err = doSubscribe(ctx, topic, ipfsNode)
+		err = doSubscribe(ctx, h, routingDiscovery, ipfsNode)
 	default:
 		err = fmt.Errorf("unknown mode %s", modeFlag)
 	}
@@ -265,7 +255,7 @@ type workflowInfo struct {
 	GithubToken    string `json:"githubToken"`
 }
 
-func doPublish(ctx context.Context, topic *pubsub.Topic, ipfsNode *rpc.HttpApi) error {
+func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
 	selfKey, err := ipfsNode.Key().Self(ctx)
 	if err != nil {
 		return err
@@ -305,9 +295,28 @@ func doPublish(ctx context.Context, topic *pubsub.Topic, ipfsNode *rpc.HttpApi) 
 
 	log.Info("Sending info...")
 
-	err = topic.Publish(ctx, b)
-	if err != nil {
-		return err
+	for {
+		peersCh, err := discovery.FindPeers(ctx, topicFlag)
+		if err != nil {
+			return err
+		}
+		didSend := false
+		for peer := range peersCh {
+			if peer.ID == h.ID() {
+				continue // No self connection
+			}
+			h.Peerstore().AddAddrs(peer.ID, peer.Addrs, time.Minute)
+
+			err = doSendInfo(ctx, h, peer.ID, b)
+			if err != nil {
+				log.Warnf("doSendInfo failed for %s: %v", peer.ID, err)
+				continue
+			}
+			didSend = true
+		}
+		if didSend {
+			break
+		}
 	}
 
 	log.Info("Done sending info.")
@@ -315,24 +324,63 @@ func doPublish(ctx context.Context, topic *pubsub.Topic, ipfsNode *rpc.HttpApi) 
 	return nil
 }
 
-func doSubscribe(ctx context.Context, topic *pubsub.Topic, ipfsNode *rpc.HttpApi) error {
-	sub, err := topic.Subscribe()
+func doSendInfo(ctx context.Context, h host.Host, id peer.ID, b []byte) error {
+	s, err := h.NewStream(ctx, id, "/x/kluctl-preview-info")
+	if err != nil {
+		return err
+	}
+	defer s.Close()
+
+	enc := gob.NewEncoder(s)
+	dec := gob.NewDecoder(s)
+
+	err = enc.Encode(b)
 	if err != nil {
 		return err
 	}
 
-	for {
-		m, err := sub.Next(ctx)
-		if err != nil {
-			return err
-		}
-		log.Info(m.ReceivedFrom, ": ", string(m.Message.Data))
-		err = handleInfo(ctx, m.Message.Data)
-		if err == nil {
-			break
-		}
-		log.Error(err)
+	var str string
+	err = dec.Decode(&str)
+	if err != nil {
+		return err
 	}
+	if str != "ok" {
+		return err
+	}
+	err = s.Close()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
+	h.SetStreamHandler("/x/kluctl-/x/kluctl-preview-info", func(s network.Stream) {
+		defer s.Close()
+
+		enc := gob.NewEncoder(s)
+		dec := gob.NewDecoder(s)
+
+		var b []byte
+		err := dec.Decode(&b)
+		if err != nil {
+			log.Warnf("Receive from %s failed: %v", s.ID(), err)
+			return
+		}
+		err = handleInfo(ctx, b)
+		if err != nil {
+			log.Warnf("Handle for %s failed: %v", s.ID(), err)
+			return
+		}
+
+		err = enc.Encode("ok")
+		if err != nil {
+			log.Warnf("Send ok to %s failed: %v", s.ID(), err)
+			return
+		}
+	})
+	dutil.Advertise(ctx, discovery, topicFlag)
+
 	return nil
 }
 
