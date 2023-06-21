@@ -59,22 +59,32 @@ func main() {
 	ipfsNode, err := rpc.NewLocalApi()
 	if err != nil {
 		log.Error(err)
-		os.Exit(1)
+		log.Exit(1)
 	}
 
 	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		log.Exit(1)
 	}
-	discoverPeers(ctx, h)
+
+	log.Infof("own ID: %s", h.ID().String())
+
+	err = discoverPeers(ctx, h)
+	if err != nil {
+		log.Error(err)
+		log.Exit(1)
+	}
 
 	ps, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		log.Exit(1)
 	}
 	topic, err := ps.Join(topicFlag)
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		log.Exit(1)
 	}
 
 	switch modeFlag {
@@ -94,17 +104,17 @@ func main() {
 	}
 }
 
-func initDHT(ctx context.Context, h host.Host) *dht.IpfsDHT {
+func initDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
 	// Start a DHT, for use in peer discovery. We can't just make a new DHT
 	// client because we want each peer to maintain its own local copy of the
 	// DHT, so that the bootstrapping node of the DHT can go down without
 	// inhibiting future peer discovery.
 	kademliaDHT, err := dht.New(ctx, h)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if err = kademliaDHT.Bootstrap(ctx); err != nil {
-		panic(err)
+		return nil, err
 	}
 	var wg sync.WaitGroup
 	for _, peerAddr := range dht.DefaultBootstrapPeers {
@@ -119,11 +129,14 @@ func initDHT(ctx context.Context, h host.Host) *dht.IpfsDHT {
 	}
 	wg.Wait()
 
-	return kademliaDHT
+	return kademliaDHT, nil
 }
 
-func discoverPeers(ctx context.Context, h host.Host) {
-	kademliaDHT := initDHT(ctx, h)
+func discoverPeers(ctx context.Context, h host.Host) error {
+	kademliaDHT, err := initDHT(ctx, h)
+	if err != nil {
+		return err
+	}
 	routingDiscovery := drouting.NewRoutingDiscovery(kademliaDHT)
 	dutil.Advertise(ctx, routingDiscovery, topicFlag)
 
@@ -152,6 +165,7 @@ func discoverPeers(ctx context.Context, h host.Host) {
 		}
 	}
 	log.Info("Peer discovery complete")
+	return nil
 }
 
 type workflowInfo struct {
