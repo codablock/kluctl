@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	logging "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/kubo/client/rpc"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -49,6 +50,8 @@ func ParseFlags() error {
 }
 
 func main() {
+	logging.SetLogLevel("*", "INFO")
+
 	err := ParseFlags()
 	if err != nil {
 		panic(err)
@@ -406,12 +409,13 @@ func (t *tracer) Trace(evt *holepunch.Event) {
 func main2() {
 	ctx := context.Background()
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.DisableRelay(), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))))
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))), libp2p.WithDialTimeout(10*time.Second))
 	if err != nil {
 		panic(err)
 	}
 	log.Info("own ID: ", h.ID())
 	log.Info("own addrs: ", h.Addrs())
+
 	go discoverPeers2(ctx, h)
 
 	ps, err := pubsub.NewGossipSub(ctx, h)
@@ -455,6 +459,8 @@ func initDHT2(ctx context.Context, h host.Host) *dht.IpfsDHT {
 		}()
 	}
 	wg.Wait()
+
+	time.Sleep(5 * time.Second)
 
 	return kademliaDHT
 }
