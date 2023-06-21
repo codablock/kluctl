@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -86,6 +87,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter num: ")
+	text, _ := reader.ReadString('\n')
+	topicFlag = "my-test-topic-" + text
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
