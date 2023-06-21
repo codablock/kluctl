@@ -82,6 +82,8 @@ func main() {
 		err = doPublish(ctx, topic, ipfsNode)
 	case "subscribe":
 		err = doSubscribe(ctx, topic, ipfsNode)
+	default:
+		err = fmt.Errorf("unknown mode %s", modeFlag)
 	}
 
 	if err != nil {
