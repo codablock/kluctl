@@ -157,10 +157,11 @@ func main() {
 
 	log.Infof("own ID: %s", h.ID().String())
 
-	discoverCh := make(chan error)
 	go func() {
 		err := discoverPeers(ctx, h)
-		discoverCh <- err
+		if err != nil {
+			panic(err)
+		}
 	}()
 
 	ps, err := pubsub.NewGossipSub(ctx, h)
@@ -169,12 +170,6 @@ func main() {
 		log.Exit(1)
 	}
 	topic, err := ps.Join(topicFlag)
-	if err != nil {
-		log.Error(err)
-		log.Exit(1)
-	}
-
-	err = <-discoverCh
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
