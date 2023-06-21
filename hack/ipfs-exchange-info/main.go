@@ -106,7 +106,7 @@ func main() {
 		panic(err)
 	}
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.ResourceManager(rcm))
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.ResourceManager(rcm), libp2p.Relaa())
 	if err != nil {
 		panic(err)
 	}
