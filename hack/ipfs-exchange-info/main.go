@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
@@ -35,6 +34,7 @@ var prNumber int
 var ageKeyFile string
 var agePubKey string
 var repoName string
+var outFile string
 
 func ParseFlags() error {
 	flag.StringVar(&modeFlag, "mode", "", "Mode")
@@ -44,6 +44,7 @@ func ParseFlags() error {
 	flag.StringVar(&ageKeyFile, "age-key-file", "", "AGE key file")
 	flag.StringVar(&agePubKey, "age-pub-key", "", "AGE pubkey")
 	flag.StringVar(&repoName, "repo-name", "", "Repo name")
+	flag.StringVar(&outFile, "out-file", "", "Output file")
 	flag.Parse()
 
 	return nil
@@ -87,10 +88,10 @@ func main() {
 		panic(err)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	/*reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter num: ")
 	text, _ := reader.ReadString('\n')
-	topicFlag = "my-test-topic-" + strings.TrimSpace(text)
+	topicFlag = "my-test-topic-" + strings.TrimSpace(text)*/
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -372,7 +373,10 @@ func handleInfo(ctx context.Context, data []byte) error {
 	if err != nil {
 		return err
 	}
-	_, _ = os.Stdout.WriteString(string(data) + "\n")
+	err = os.WriteFile(outFile, data, 0o600)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
