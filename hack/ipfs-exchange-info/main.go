@@ -70,6 +70,12 @@ func main() {
 
 	log.Infof("own ID: %s", h.ID().String())
 
+	discoverCh := make(chan error)
+	go func() {
+		err := discoverPeers(ctx, h)
+		discoverCh <- err
+	}()
+
 	ps, err := pubsub.NewGossipSub(ctx, h)
 	if err != nil {
 		log.Error(err)
@@ -81,7 +87,7 @@ func main() {
 		log.Exit(1)
 	}
 
-	err = discoverPeers(ctx, h)
+	err = <-discoverCh
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
