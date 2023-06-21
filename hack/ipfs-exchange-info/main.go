@@ -410,6 +410,8 @@ func main2() {
 	if err != nil {
 		panic(err)
 	}
+	log.Info("own ID: ", h.ID())
+	log.Info("own addrs: ", h.Addrs())
 	go discoverPeers2(ctx, h)
 
 	ps, err := pubsub.NewGossipSub(ctx, h)
