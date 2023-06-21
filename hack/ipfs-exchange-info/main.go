@@ -145,6 +145,9 @@ func discoverPeers(ctx context.Context, h host.Host) {
 				anyConnected = true
 			}
 		}
+		if !anyConnected {
+			time.Sleep(5 * time.Second)
+		}
 	}
 	log.Info("Peer discovery complete")
 }
