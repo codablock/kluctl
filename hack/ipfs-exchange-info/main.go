@@ -444,9 +444,7 @@ func initDHT2(ctx context.Context, h host.Host) *dht.IpfsDHT {
 	if err != nil {
 		panic(err)
 	}
-	if err = kademliaDHT.Bootstrap(ctx); err != nil {
-		panic(err)
-	}
+
 	var wg sync.WaitGroup
 	for _, peerAddr := range dht.DefaultBootstrapPeers {
 		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
@@ -460,7 +458,9 @@ func initDHT2(ctx context.Context, h host.Host) *dht.IpfsDHT {
 	}
 	wg.Wait()
 
-	time.Sleep(5 * time.Second)
+	if err = kademliaDHT.Bootstrap(ctx); err != nil {
+		panic(err)
+	}
 
 	return kademliaDHT
 }
