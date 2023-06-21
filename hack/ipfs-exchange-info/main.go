@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
@@ -10,15 +11,23 @@ import (
 	"fmt"
 	"github.com/ipfs/boxo/coreiface/options"
 	"github.com/ipfs/boxo/files"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/peer"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ipfs/kubo/client/rpc"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	drouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	dutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 )
 
 var modeFlag string
@@ -30,6 +39,7 @@ var prNumber int
 var ageKeyFile string
 var agePubKey string
 var repoName string
+var topic string
 
 func ParseFlags() error {
 	flag.StringVar(&modeFlag, "mode", "", "Mode")
@@ -41,6 +51,7 @@ func ParseFlags() error {
 	flag.StringVar(&ageKeyFile, "age-key-file", "", "AGE key file")
 	flag.StringVar(&agePubKey, "age-pub-key", "", "AGE pubkey")
 	flag.StringVar(&repoName, "repo-name", "", "Repo name")
+	flag.StringVar(&topic, "topic", "", "pubsub topic")
 	flag.Parse()
 
 	return nil
@@ -52,31 +63,125 @@ func main() {
 		panic(err)
 	}
 
-	// "Connect" to local node
-	node, err := rpc.NewLocalApi()
-	if err != nil {
-		log.Error(err)
-		os.Exit(1)
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
 
-	switch modeFlag {
-	case "publish-ipns":
-		err = doPublishIpns(node)
-	case "resolve-ipns":
-		err = doResolve(node)
-	case "send-info":
-		err = doSend(node)
-	case "receive-info":
-		err = doReceive(node)
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
+	if err != nil {
+		panic(err)
+	}
+	go discoverPeers(ctx, h)
+
+	ps, err := pubsub.NewGossipSub(ctx, h)
+	if err != nil {
+		panic(err)
+	}
+	topic, err := ps.Join(topic)
+	if err != nil {
+		panic(err)
+	}
+	go streamConsoleTo(ctx, topic)
+
+	sub, err := topic.Subscribe()
+	if err != nil {
+		panic(err)
+	}
+	printMessagesFrom(ctx, sub)
+
+	/*switch modeFlag {
+	case "listen-info":
+		err = doListenInfo(node)
+	case "publish-info":
+		err = doPublishInfo(node)
 	default:
 		err = fmt.Errorf("unknown mode %s", modeFlag)
-	}
+	}*/
 
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
 	} else {
 		log.Exit(0)
+	}
+}
+
+func initDHT(ctx context.Context, h host.Host) *dht.IpfsDHT {
+	// Start a DHT, for use in peer discovery. We can't just make a new DHT
+	// client because we want each peer to maintain its own local copy of the
+	// DHT, so that the bootstrapping node of the DHT can go down without
+	// inhibiting future peer discovery.
+	kademliaDHT, err := dht.New(ctx, h)
+	if err != nil {
+		panic(err)
+	}
+	if err = kademliaDHT.Bootstrap(ctx); err != nil {
+		panic(err)
+	}
+	var wg sync.WaitGroup
+	for _, peerAddr := range dht.DefaultBootstrapPeers {
+		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := h.Connect(ctx, *peerinfo); err != nil {
+				fmt.Println("Bootstrap warning:", err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	return kademliaDHT
+}
+
+func discoverPeers(ctx context.Context, h host.Host) {
+	kademliaDHT := initDHT(ctx, h)
+	routingDiscovery := drouting.NewRoutingDiscovery(kademliaDHT)
+	dutil.Advertise(ctx, routingDiscovery, topic)
+
+	// Look for others who have announced and attempt to connect to them
+	anyConnected := false
+	for !anyConnected {
+		fmt.Println("Searching for peers...")
+		peerChan, err := routingDiscovery.FindPeers(ctx, topic)
+		if err != nil {
+			panic(err)
+		}
+		for peer := range peerChan {
+			if peer.ID == h.ID() {
+				continue // No self connection
+			}
+			err := h.Connect(ctx, peer)
+			if err != nil {
+				fmt.Println("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
+			} else {
+				fmt.Println("Connected to:", peer.ID.Pretty())
+				anyConnected = true
+			}
+		}
+	}
+	fmt.Println("Peer discovery complete")
+}
+
+func streamConsoleTo(ctx context.Context, topic *pubsub.Topic) {
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		s, err := reader.ReadString('\n')
+		if err != nil {
+			panic(err)
+		}
+		if err := topic.Publish(ctx, []byte(s)); err != nil {
+			fmt.Println("### Publish error:", err)
+		}
+	}
+}
+
+func printMessagesFrom(ctx context.Context, sub *pubsub.Subscription) {
+	for {
+		m, err := sub.Next(ctx)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(m.ReceivedFrom, ": ", string(m.Message.Data))
 	}
 }
 
