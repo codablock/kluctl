@@ -62,7 +62,7 @@ func main() {
 		log.Exit(1)
 	}
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
+	h, err := libp2p.New(libp2p.NoListenAddrs, libp2p.EnableRelay())
 	if err != nil {
 		log.Error(err)
 		log.Exit(1)
