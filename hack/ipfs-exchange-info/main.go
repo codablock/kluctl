@@ -11,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
@@ -395,10 +396,17 @@ func checkGithubToken(ctx context.Context, token string) error {
 	return nil
 }
 
+type tracer struct {
+}
+
+func (t *tracer) Trace(evt *holepunch.Event) {
+	log.Info(evt)
+}
+
 func main2() {
 	ctx := context.Background()
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"))
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableRelay(), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))))
 	if err != nil {
 		panic(err)
 	}
