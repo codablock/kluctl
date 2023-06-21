@@ -14,7 +14,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
-	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net/http"
@@ -123,34 +122,7 @@ func main() {
 		libp2p.EnableHolePunching(),
 		libp2p.EnableAutoRelayWithStaticRelays([]peer.AddrInfo{
 			*relayServer,
-		}),
-		/*libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, num int) <-chan peer.AddrInfo {
-			ch := make(chan peer.AddrInfo)
-			go func() {
-				sent := 0
-				for _, id := range h.Peerstore().PeersWithAddrs() {
-					if sent >= num {
-						break
-					}
-					protos, err := h.Peerstore().GetProtocols(id)
-					if err != nil {
-						continue
-					}
-					for _, proto := range protos {
-						if strings.HasPrefix(string(proto), "/libp2p/circuit/relay/") {
-							ch <- peer.AddrInfo{
-								ID:    id,
-								Addrs: h.Peerstore().Addrs(id),
-							}
-							sent++
-							break
-						}
-					}
-				}
-				close(ch)
-			}()
-			return ch
-		})*/)
+		}))
 	if err != nil {
 		panic(err)
 	}
@@ -209,42 +181,6 @@ func initDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
 	wg.Wait()
 
 	return kademliaDHT, nil
-}
-
-func discoverPeers(ctx context.Context, h host.Host) error {
-	kademliaDHT, err := initDHT(ctx, h)
-	if err != nil {
-		return err
-	}
-	routingDiscovery := drouting.NewRoutingDiscovery(kademliaDHT)
-	dutil.Advertise(ctx, routingDiscovery, topicFlag)
-
-	// Look for others who have announced and attempt to connect to them
-	anyConnected := false
-	for !anyConnected {
-		log.Info("Searching for peers...")
-		peerChan, err := routingDiscovery.FindPeers(ctx, topicFlag)
-		if err != nil {
-			panic(err)
-		}
-		for peer := range peerChan {
-			if peer.ID == h.ID() {
-				continue // No self connection
-			}
-			err := h.Connect(ctx, peer)
-			if err != nil {
-				log.Info("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
-			} else {
-				log.Info("Connected to:", peer.ID.Pretty())
-				anyConnected = true
-			}
-		}
-		if !anyConnected {
-			time.Sleep(5 * time.Second)
-		}
-	}
-	log.Info("Peer discovery complete")
-	return nil
 }
 
 type workflowInfo struct {
@@ -523,11 +459,4 @@ func checkGithubToken(ctx context.Context, token string) error {
 	}
 
 	return nil
-}
-
-type tracer struct {
-}
-
-func (t *tracer) Trace(evt *holepunch.Event) {
-	log.Info(evt)
 }
