@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -49,17 +48,42 @@ func ParseFlags() error {
 	return nil
 }
 
+const limiterCfg = `
+{
+  "System":  {
+    "StreamsInbound": 4096,
+    "StreamsOutbound": 32768,
+    "Conns": 64000,
+    "ConnsInbound": 512,
+    "ConnsOutbound": 32768,
+    "FD": 64000
+  },
+  "Transient": {
+    "StreamsInbound": 4096,
+    "StreamsOutbound": 32768,
+    "ConnsInbound": 512,
+    "ConnsOutbound": 32768,
+    "FD": 64000
+  },
+
+  "ProtocolDefault":{
+    "StreamsInbound": 1024,
+    "StreamsOutbound": 32768
+  },
+
+  "ServiceDefault":{
+    "StreamsInbound": 2048,
+    "StreamsOutbound": 32768
+  }
+}
+`
+
 func main() {
 	//logging.SetLogLevel("*", "INFO")
 
 	err := ParseFlags()
 	if err != nil {
 		panic(err)
-	}
-
-	if strings.HasPrefix(topicFlag, "test-") {
-		main2()
-		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -72,10 +96,18 @@ func main() {
 		log.Exit(1)
 	}
 
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching())
+	limiter, err := rcmgr.NewDefaultLimiterFromJSON(strings.NewReader(limiterCfg))
 	if err != nil {
-		log.Error(err)
-		log.Exit(1)
+		panic(err)
+	}
+	rcm, err := rcmgr.NewResourceManager(limiter)
+	if err != nil {
+		panic(err)
+	}
+
+	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))), libp2p.ResourceManager(rcm))
+	if err != nil {
+		panic(err)
 	}
 
 	log.Infof("own ID: %s", h.ID().String())
@@ -404,154 +436,4 @@ type tracer struct {
 
 func (t *tracer) Trace(evt *holepunch.Event) {
 	log.Info(evt)
-}
-
-const limiterCfg = `
-{
-  "System":  {
-    "StreamsInbound": 4096,
-    "StreamsOutbound": 32768,
-    "Conns": 64000,
-    "ConnsInbound": 512,
-    "ConnsOutbound": 32768,
-    "FD": 64000
-  },
-  "Transient": {
-    "StreamsInbound": 4096,
-    "StreamsOutbound": 32768,
-    "ConnsInbound": 512,
-    "ConnsOutbound": 32768,
-    "FD": 64000
-  },
-
-  "ProtocolDefault":{
-    "StreamsInbound": 1024,
-    "StreamsOutbound": 32768
-  },
-
-  "ServiceDefault":{
-    "StreamsInbound": 2048,
-    "StreamsOutbound": 32768
-  }
-}
-`
-
-func main2() {
-	ctx := context.Background()
-
-	limiter, err := rcmgr.NewDefaultLimiterFromJSON(strings.NewReader(limiterCfg))
-	if err != nil {
-		panic(err)
-	}
-	rcm, err := rcmgr.NewResourceManager(limiter)
-	if err != nil {
-		panic(err)
-	}
-
-	h, err := libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"), libp2p.EnableHolePunching(holepunch.WithTracer(holepunch.EventTracer(&tracer{}))), libp2p.ResourceManager(rcm))
-	if err != nil {
-		panic(err)
-	}
-	log.Info("own ID: ", h.ID())
-	log.Info("own addrs: ", h.Addrs())
-
-	go discoverPeers2(ctx, h)
-
-	ps, err := pubsub.NewGossipSub(ctx, h)
-	if err != nil {
-		panic(err)
-	}
-	topic, err := ps.Join(topicFlag)
-	if err != nil {
-		panic(err)
-	}
-	go streamConsoleTo(ctx, topic)
-
-	sub, err := topic.Subscribe()
-	if err != nil {
-		panic(err)
-	}
-	printMessagesFrom(ctx, sub)
-}
-
-func initDHT2(ctx context.Context, h host.Host) *dht.IpfsDHT {
-	// Start a DHT, for use in peer discovery. We can't just make a new DHT
-	// client because we want each peer to maintain its own local copy of the
-	// DHT, so that the bootstrapping node of the DHT can go down without
-	// inhibiting future peer discovery.
-	kademliaDHT, err := dht.New(ctx, h)
-	if err != nil {
-		panic(err)
-	}
-
-	var wg sync.WaitGroup
-	for _, peerAddr := range dht.DefaultBootstrapPeers {
-		peerinfo, _ := peer.AddrInfoFromP2pAddr(peerAddr)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if err := h.Connect(ctx, *peerinfo); err != nil {
-				fmt.Println("Bootstrap warning:", err)
-			}
-		}()
-	}
-	wg.Wait()
-
-	if err = kademliaDHT.Bootstrap(ctx); err != nil {
-		panic(err)
-	}
-
-	return kademliaDHT
-}
-
-func discoverPeers2(ctx context.Context, h host.Host) {
-	kademliaDHT := initDHT2(ctx, h)
-	routingDiscovery := drouting.NewRoutingDiscovery(kademliaDHT)
-	dutil.Advertise(ctx, routingDiscovery, topicFlag)
-
-	// Look for others who have announced and attempt to connect to them
-	anyConnected := false
-	for !anyConnected {
-		fmt.Println("Searching for peers...")
-		peerChan, err := routingDiscovery.FindPeers(ctx, topicFlag)
-		if err != nil {
-			panic(err)
-		}
-		for peer := range peerChan {
-			if peer.ID == h.ID() {
-				continue // No self connection
-			}
-			err := h.Connect(ctx, peer)
-			if err != nil {
-				fmt.Println("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
-			} else {
-				fmt.Println("Connected to:", peer.ID.Pretty())
-				anyConnected = true
-			}
-		}
-	}
-	fmt.Println("Peer discovery complete")
-}
-
-func streamConsoleTo(ctx context.Context, topic *pubsub.Topic) {
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		s, err := reader.ReadString('\n')
-		if err != nil {
-			panic(err)
-		}
-		if err := topic.Publish(ctx, []byte(s)); err != nil {
-			fmt.Println("### Publish error:", err)
-		}
-	}
-}
-
-func printMessagesFrom(ctx context.Context, sub *pubsub.Subscription) {
-	for {
-		m, err := sub.Next(ctx)
-		if err != nil {
-			panic(err)
-		}
-		fmt.Println(m.ReceivedFrom, ": ", string(m.Message.Data))
-	}
 }
