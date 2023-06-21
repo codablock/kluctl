@@ -168,9 +168,9 @@ func discoverPeers(ctx context.Context, h host.Host) error {
 				anyConnected = true
 			}
 		}
-		if !anyConnected {
+		/*if !anyConnected {
 			time.Sleep(5 * time.Second)
-		}
+		}*/
 	}
 	log.Info("Peer discovery complete")
 	return nil
