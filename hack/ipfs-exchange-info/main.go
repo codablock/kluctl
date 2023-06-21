@@ -242,12 +242,12 @@ func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *
 		doneCh <- true
 	})
 
-	hash, err := nsToCid(topicFlag)
+	/*hash, err := nsToCid(topicFlag)
 	if err != nil {
 		return err
 	}
 
-	//dht.ProviderStore().AddProvider(ctx, hash.Hash())
+	dht.ProviderStore().AddProvider(ctx, hash.Hash())*/
 	dutil.Advertise(ctx, discovery, topicFlag)
 	<-doneCh
 	return nil
