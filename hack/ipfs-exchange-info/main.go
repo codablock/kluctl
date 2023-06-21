@@ -112,17 +112,37 @@ func main() {
 		panic(err)
 	}
 
-	relayServer, err := peer.AddrInfoFromP2pAddr(dht.DefaultBootstrapPeers[len(dht.DefaultBootstrapPeers)-1])
-	if err != nil {
-		panic(err)
-	}
 	var h host.Host
 	h, err = libp2p.New(libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
 		libp2p.ResourceManager(rcm),
 		libp2p.EnableRelay(),
 		libp2p.EnableHolePunching(),
-		libp2p.EnableAutoRelayWithStaticRelays([]peer.AddrInfo{
-			*relayServer,
+		libp2p.EnableAutoRelayWithPeerSource(func(ctx context.Context, num int) <-chan peer.AddrInfo {
+			ch := make(chan peer.AddrInfo)
+			go func() {
+				sent := 0
+				for _, id := range h.Peerstore().PeersWithAddrs() {
+					if sent >= num {
+						break
+					}
+					protos, err := h.Peerstore().GetProtocols(id)
+					if err != nil {
+						continue
+					}
+					for _, proto := range protos {
+						if strings.HasPrefix(string(proto), "/libp2p/circuit/relay/") {
+							ch <- peer.AddrInfo{
+								ID:    id,
+								Addrs: h.Peerstore().Addrs(id),
+							}
+							sent++
+							break
+						}
+					}
+				}
+				close(ch)
+			}()
+			return ch
 		}))
 	if err != nil {
 		panic(err)
@@ -177,6 +197,9 @@ func initDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
 			} else {
 				log.Infof("Connected to bootstrap peer: %s", peerinfo.String())
 			}
+
+			protos, _ := h.Peerstore().GetProtocols(peerinfo.ID)
+			log.Info(protos)
 		}()
 	}
 	wg.Wait()
@@ -241,6 +264,7 @@ func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDisc
 			if peer.ID == h.ID() {
 				continue // No self connection
 			}
+
 			h.Peerstore().AddAddrs(peer.ID, peer.Addrs, time.Minute)
 
 			err = doSendInfo(ctx, h, peer.ID, b)
@@ -381,7 +405,7 @@ func handleInfo(ctx context.Context, data []byte) error {
 }
 
 func doGithubRequest(ctx context.Context, method string, url string, body string, token string) ([]byte, error) {
-	log.Info("request: ", method, url)
+	log.Infof("request: %s %s", method, url)
 
 	req, err := http.NewRequest(method, url, strings.NewReader(body))
 	if err != nil {
