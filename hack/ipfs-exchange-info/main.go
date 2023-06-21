@@ -355,6 +355,7 @@ func doSendInfo(ctx context.Context, h host.Host, id peer.ID, b []byte) error {
 }
 
 func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDiscovery, ipfsNode *rpc.HttpApi) error {
+	done := make(chan bool)
 	h.SetStreamHandler("/x/kluctl-/x/kluctl-preview-info", func(s network.Stream) {
 		defer s.Close()
 
@@ -378,10 +379,16 @@ func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDi
 			log.Warnf("Send ok to %s failed: %v", s.ID(), err)
 			return
 		}
+		done <- true
 	})
 	dutil.Advertise(ctx, discovery, topicFlag)
 
-	return nil
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func handleInfo(ctx context.Context, data []byte) error {
