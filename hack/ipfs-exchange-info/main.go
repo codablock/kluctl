@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
-	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	rcmgr "github.com/libp2p/go-libp2p/p2p/host/resource-manager"
 	"github.com/libp2p/go-libp2p/p2p/protocol/holepunch"
@@ -91,7 +90,7 @@ func main() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter num: ")
 	text, _ := reader.ReadString('\n')
-	topicFlag = "my-test-topic-" + text
+	topicFlag = "my-test-topic-" + strings.TrimSpace(text)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -240,7 +239,7 @@ func discoverPeers(ctx context.Context, h host.Host) error {
 			if peer.ID == h.ID() {
 				continue // No self connection
 			}
-			err := h.Connect(network.WithForceDirectDial(ctx, "test"), peer)
+			err := h.Connect(ctx, peer)
 			if err != nil {
 				log.Info("Failed connecting to ", peer.ID.Pretty(), ", error:", err)
 			} else {
