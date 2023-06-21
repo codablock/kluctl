@@ -131,6 +131,7 @@ func main() {
 						}
 					}
 				}
+				close(ch)
 			}()
 			return ch
 		}))
