@@ -80,7 +80,7 @@ func main() {
 	switch modeFlag {
 	case "publish":
 		err = doPublish(ctx, topic, ipfsNode)
-	case "subsribe":
+	case "subscribe":
 		err = doSubscribe(ctx, topic, ipfsNode)
 	}
 
