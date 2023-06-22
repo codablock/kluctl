@@ -77,7 +77,15 @@ func main() {
 	}
 
 	var h host.Host
-	h, err = libp2p.New(libp2p.NoListenAddrs)
+	h, err = libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/0.0.0.0/tcp/0"),
+		libp2p.EnableRelay(),
+		libp2p.EnableNATService(),
+		libp2p.NATPortMap(),
+		libp2p.ForceReachabilityPrivate(),
+		libp2p.EnableAutoRelayWithPeerSource(findRelayPeers(func() host.Host {
+			return h
+		})))
 	if err != nil {
 		panic(err)
 	}
@@ -138,6 +146,45 @@ func initDHT(ctx context.Context, h host.Host) (*dht.IpfsDHT, error) {
 	return kademliaDHT, nil
 }
 
+func findRelayPeers(h func() host.Host) func(ctx context.Context, num int) <-chan peer.AddrInfo {
+	return func(ctx context.Context, num int) <-chan peer.AddrInfo {
+		ch := make(chan peer.AddrInfo)
+		go func() {
+			sent := 0
+		outer:
+			for {
+				for _, id := range h().Peerstore().PeersWithAddrs() {
+					if sent >= num {
+						break
+					}
+					protos, err := h().Peerstore().GetProtocols(id)
+					if err != nil {
+						continue
+					}
+					for _, proto := range protos {
+						if strings.HasPrefix(string(proto), "/libp2p/circuit/relay/") {
+							ch <- peer.AddrInfo{
+								ID:    id,
+								Addrs: h().Peerstore().Addrs(id),
+							}
+							sent++
+							break
+						}
+					}
+				}
+				select {
+				case <-time.After(time.Second):
+					continue
+				case <-ctx.Done():
+					break outer
+				}
+			}
+			close(ch)
+		}()
+		return ch
+	}
+}
+
 type workflowInfo struct {
 	PrNumber       int    `json:"prNumber"`
 	IpfsId         string `json:"ipfsId"`
@@ -185,6 +232,11 @@ func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDisc
 
 	log.Info("Sending info...")
 
+	/*hash, err := nsToCid(topicFlag)
+	if err != nil {
+		return err
+	}*/
+
 	for {
 		peersCh, err := discovery.FindPeers(ctx, topicFlag)
 		if err != nil {
@@ -196,11 +248,27 @@ func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDisc
 				continue // No self connection
 			}
 
-			err = p2pSendFile(ctx, ipfsNode, peer.ID, b)
+			addrs2 := h.Peerstore().Addrs(peer.ID)
+			peer2 := h.Peerstore().PeerInfo(peer.ID)
+
+			log.Infof("Trying %s with addrs %v, %v, %v", peer.ID, peer.Addrs, addrs2, peer2)
+
+			err = h.Connect(ctx, peer2)
+			if err != nil {
+				log.Info(err)
+				continue
+			}
+
+			err = sendFile(ctx, h, peer.ID, b)
+			if err != nil {
+				log.Warn(err)
+				continue
+			}
+			/*err = p2pSendFile(ctx, ipfsNode, peer.ID, b)
 			if err != nil {
 				log.Warnf("doSendInfo failed for %s: %v", peer.ID, err)
 				continue
-			}
+			}*/
 			didSend = true
 		}
 		if didSend {
@@ -231,6 +299,7 @@ func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *
 		err = handleInfo(ctx, b)
 		if err != nil {
 			log.Infof("handle failed: %v", err)
+			_ = enc.Encode("not ok")
 			return
 		}
 
@@ -245,11 +314,23 @@ func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *
 	/*hash, err := nsToCid(topicFlag)
 	if err != nil {
 		return err
-	}
+	}*/
 
-	dht.ProviderStore().AddProvider(ctx, hash.Hash())*/
+	/*selfKey, err := ipfsNode.Key().Self(ctx)
+	if err != nil {
+		return err
+	}*/
+
+	//dht.ProviderStore().AddProvider(ctx, hash.Hash(), peer.AddrInfo{
+	//	ID: selfKey.ID(),
+	//})
 	dutil.Advertise(ctx, discovery, topicFlag)
 	<-doneCh
+
+	/*err = p2pReceiveFiles(ctx, ipfsNode, func(b []byte) error {
+		return handleInfo(ctx, b)
+	})*/
+
 	return nil
 }
 
@@ -397,6 +478,29 @@ func checkGithubToken(ctx context.Context, token string) error {
 		return fmt.Errorf("%s is not the expected repo name", r2.Repositories[0].FullName)
 	}
 
+	return nil
+}
+
+func sendFile(ctx context.Context, h host.Host, ipfsId peer.ID, data []byte) error {
+	s, err := h.NewStream(ctx, ipfsId, "/x/kluctl-preview-info")
+	if err != nil {
+		return fmt.Errorf("failed to connect to %s: %w", ipfsId.String(), err)
+	}
+	defer s.Close()
+
+	enc := gob.NewEncoder(s)
+	dec := gob.NewDecoder(s)
+
+	err = enc.Encode(data)
+	if err != nil {
+		return fmt.Errorf("failed to send msg: %w", err)
+	}
+
+	var ok string
+	err = dec.Decode(&ok)
+	if err != nil {
+		return fmt.Errorf("failed to read ok: %w", err)
+	}
 	return nil
 }
 
