@@ -451,11 +451,6 @@ func sendFile(ctx context.Context, h host.Host, ipfsId peer.ID, data []byte) err
 		return fmt.Errorf("failed to send msg: %w", err)
 	}
 
-	err = s.CloseWrite()
-	if err != nil {
-		return fmt.Errorf("CloseWrite failed: %w", err)
-	}
-
 	var ok string
 	err = dec.Decode(&ok)
 	if err != nil {
