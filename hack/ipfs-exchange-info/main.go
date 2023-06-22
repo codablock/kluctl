@@ -295,12 +295,6 @@ func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *
 			return
 		}
 
-		err = s.CloseRead()
-		if err != nil {
-			log.Infof("CloseRead failed: %v", err)
-			return
-		}
-
 		err = handleInfo(ctx, b)
 		if err != nil {
 			log.Infof("handle failed: %v", err)
