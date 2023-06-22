@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
@@ -60,10 +61,12 @@ func main() {
 		panic(err)
 	}
 
-	/*reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter num: ")
-	text, _ := reader.ReadString('\n')
-	topicFlag = "my-test-topic-" + strings.TrimSpace(text)*/
+	if topicFlag == "test" {
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Enter num: ")
+		text, _ := reader.ReadString('\n')
+		topicFlag = "my-test-topic-" + strings.TrimSpace(text)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -292,19 +295,28 @@ func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *
 			return
 		}
 
+		err = s.CloseRead()
+		if err != nil {
+			log.Infof("CloseRead failed: %v", err)
+			return
+		}
+
 		err = handleInfo(ctx, b)
 		if err != nil {
 			log.Infof("handle failed: %v", err)
 			_ = enc.Encode("not ok")
-			return
+		} else {
+			err = enc.Encode("ok")
+			if err != nil {
+				log.Infof("Sending ok failed: %v", err)
+				return
+			}
+			doneCh <- true
 		}
-
-		err = enc.Encode("ok")
+		err = s.CloseWrite()
 		if err != nil {
-			log.Infof("Sending ok failed: %v", err)
-			return
+			log.Infof("CloseWrite failed: %v", err)
 		}
-		doneCh <- true
 	})
 
 	/*hash, err := nsToCid(topicFlag)
@@ -322,6 +334,7 @@ func doSubscribe(ctx context.Context, h host.Host, dht *dht.IpfsDHT, discovery *
 	//})
 	dutil.Advertise(ctx, discovery, topicFlag)
 	<-doneCh
+	h.RemoveStreamHandler("/x/kluctl-preview-info")
 
 	/*err = p2pReceiveFiles(ctx, ipfsNode, func(b []byte) error {
 		return handleInfo(ctx, b)
@@ -492,6 +505,11 @@ func sendFile(ctx context.Context, h host.Host, ipfsId peer.ID, data []byte) err
 		return fmt.Errorf("failed to send msg: %w", err)
 	}
 
+	err = s.CloseWrite()
+	if err != nil {
+		return fmt.Errorf("CloseWrite failed: %w", err)
+	}
+
 	var ok string
 	err = dec.Decode(&ok)
 	if err != nil {
@@ -500,6 +518,9 @@ func sendFile(ctx context.Context, h host.Host, ipfsId peer.ID, data []byte) err
 	if ok != "ok" {
 		return fmt.Errorf("received '%s' instead of ok", ok)
 	}
+
+	s.Close()
+
 	return nil
 }
 
