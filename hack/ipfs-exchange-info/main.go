@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/gob"
@@ -61,10 +60,10 @@ func main() {
 		panic(err)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	/*reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter num: ")
 	text, _ := reader.ReadString('\n')
-	topicFlag = "my-test-topic-" + strings.TrimSpace(text)
+	topicFlag = "my-test-topic-" + strings.TrimSpace(text)*/
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -248,12 +247,9 @@ func doPublish(ctx context.Context, h host.Host, discovery *drouting.RoutingDisc
 				continue // No self connection
 			}
 
-			addrs2 := h.Peerstore().Addrs(peer.ID)
-			peer2 := h.Peerstore().PeerInfo(peer.ID)
+			log.Infof("Trying %s with addrs %v", peer.ID, peer.Addrs)
 
-			log.Infof("Trying %s with addrs %v, %v, %v", peer.ID, peer.Addrs, addrs2, peer2)
-
-			err = h.Connect(ctx, peer2)
+			err = h.Connect(ctx, peer)
 			if err != nil {
 				log.Info(err)
 				continue
@@ -500,6 +496,9 @@ func sendFile(ctx context.Context, h host.Host, ipfsId peer.ID, data []byte) err
 	err = dec.Decode(&ok)
 	if err != nil {
 		return fmt.Errorf("failed to read ok: %w", err)
+	}
+	if ok != "ok" {
+		return fmt.Errorf("received '%s' instead of ok", ok)
 	}
 	return nil
 }

@@ -60,6 +60,20 @@ jobs:
           done
           # kick of ipns resolving in the background to warm it up
           ipfs name resolve k51qzi5uqu5diql7mejg4dfn35igqqf22202vgv3sepjrsobtya2xihqqtshbe &
+      # SEND INFO
+      - name: Build ipfs-exchange-info
+        run: |
+          (cd ./hack/ipfs-exchange-info && go build ./)
+      - name: send info
+        run: |
+          static_ipns_name=$(ipfs key gen static-webui)
+          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish -topic kluctl-preview-${{ github.event.pull_request.number }} -pr-number ${{ github.event.pull_request.number }} -age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 --static-ipns-name $static_ipns_name
+        env:
+          # we send the GITHUB_TOKEN to the preview-comment workflow. This token is then verified to be from a workflow
+          # that runs inside this repo, which can only be a workflow that got manually approved. The token is encrypted
+          # via age
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # SETUP SSH
       - name: Setup ssh
         run: |
           mkdir -p ~/.ssh
@@ -136,19 +150,6 @@ jobs:
         run: |
           ipfs p2p listen /x/k /ip4/127.0.0.1/tcp/6443
           ipfs p2p listen /x/kluctl-webui /ip4/127.0.0.1/tcp/9090
-      # SEND INFO
-      - name: Build ipfs-exchange-info
-        run: |
-          (cd ./hack/ipfs-exchange-info && go build ./)
-      - name: send info
-        run: |
-          static_ipns_name=$(ipfs key gen static-webui)
-          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish -topic kluctl-preview-${{ github.event.pull_request.number }} -pr-number ${{ github.event.pull_request.number }} -age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 --static-ipns-name $static_ipns_name
-        env:
-          # we send the GITHUB_TOKEN to the preview-comment workflow. This token is then verified to be from a workflow
-          # that runs inside this repo, which can only be a workflow that got manually approved. The token is encrypted
-          # via age
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # GENERATE STATIC WEBUI
       - name: Publish static webui and sleep
         run: |
