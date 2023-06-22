@@ -272,6 +272,7 @@ func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDi
 		}
 
 		err = handleInfo(ctx, b)
+		isDone := err != nil
 		if err != nil {
 			log.Infof("handle failed: %v", err)
 			_ = enc.Encode("not ok")
@@ -281,13 +282,16 @@ func doSubscribe(ctx context.Context, h host.Host, discovery *drouting.RoutingDi
 				log.Infof("Sending ok failed: %v", err)
 				return
 			}
-			doneCh <- true
 		}
 
 		var closeMsg string
 		err = dec.Decode(&closeMsg)
 		if err != nil {
 			log.Infof("Receiving close msg failed: %v", err)
+		}
+
+		if isDone {
+			doneCh <- true
 		}
 	})
 
