@@ -67,7 +67,12 @@ jobs:
       - name: send info
         run: |
           static_ipns_name=$(ipfs key gen static-webui)
-          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish -topic kluctl-preview-${{ github.event.pull_request.number }} -pr-number ${{ github.event.pull_request.number }} -age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7 --static-ipns-name $static_ipns_name
+          ./hack/ipfs-exchange-info/ipfs-exchange-info -mode publish \
+            -topic kluctl-preview-${{ github.event.pull_request.number }} \
+            -ipfs-id $(ipfs id -f "<id>") \
+            -static-ipns-name $static_ipns_name \
+            -pr-number ${{ github.event.pull_request.number }} \
+            -age-pub-key age1dhueesr5qj8e8uy298k7z8x3ntv620rde89phumg0kvjx2t32elsm759z7
         env:
           # we send the GITHUB_TOKEN to the preview-comment workflow. This token is then verified to be from a workflow
           # that runs inside this repo, which can only be a workflow that got manually approved. The token is encrypted
