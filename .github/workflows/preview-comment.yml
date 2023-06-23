@@ -85,7 +85,7 @@ jobs:
           # 🤖 Preview Environment
           The preview environment is running.
           
-          # Accessing the static preview UI
+          # Accessing the static UI
           This version of the UI is static but updated regularly. The updates will lag quite a lot, as IPFS needs
           some time to propagate changes. You'd also need to refresh the page to get an update. This version of the UI
           is not able to interact with the cluster, due to missing WebSockets support in IPFS. Use IPFS p2p forwarding
@@ -93,12 +93,26 @@ jobs:
           
           The public gateway url is: https://ipfs.io/ipns/$(cat static_ipns_name)/index.html
           
-          For much better perforamance and update-speed, install and start [IPFS Kubo](https://github.com/ipfs/kubo/)
+          For much better performance and update-speed, install and start [IPFS Kubo](https://github.com/ipfs/kubo/)
           locally and use this URL: http://$(cat static_ipns_name).ipns.localhost:8080/index.html
           
           If you configured a different gateway port then the default (8080), fix the url accordingly.
           
-          # Accessing the dynamic preview UI
+          # Accessing the dynamic UI via ipfs/kubo HTTP proxy
+          You can also use ipfs/kubo as a local http proxy. Enable the experimental flags this way:
+          \`\`\`
+          ipfs config --json Experimental.Libp2pStreamMounting true
+          ipfs config --json Experimental.P2pHttpProxy true
+          \`\`\`
+          
+          Afterwards (re-)start the ipfs daemon.
+          
+          The https proxy url is: http://localhost:8080/p2p/$(cat ipfs_id)/http/
+          If you configured a different gateway port then the default (8080), fix the url accordingly.
+          
+          # Port forwarding
+          You can also use ipfs/kubo to directly forward the involved ports.
+          
           First, install and start [IPFS Kubo](https://github.com/ipfs/kubo/) locally.
           Then run the \`http\` forward command from below.
           After that, the UI will be accessible through http://localhost:9090.
