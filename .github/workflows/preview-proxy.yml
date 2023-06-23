@@ -124,7 +124,7 @@ jobs:
       - name: Wait for preview-run to exit
         uses: lewagon/wait-on-check-action@v1.3.1
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.pull_request.base.ref }}
           check-name: 'preview-run'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
@@ -135,8 +135,8 @@ jobs:
           cloudflared tunnel delete $TUNNEL_ID
           
           token="${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}"
-          zone_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones" | jq '.result[] | select(.name == "kluctl.com")' -r)
-          record_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records" | jq '.result[] | select(.name == "${{ github.event.pull_request.number }}.kluctl.com")' -r)
+          zone_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones" | jq '.result[] | select(.name == "kluctl.com").id' -r)
+          record_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records" | jq '.result[] | select(.zone_name == "${{ github.event.pull_request.number }}.kluctl.com").id' -r)
           curl -X DELETE -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id"
       - uses: mshick/add-pr-comment@v2
         if: ${{ always() }}
