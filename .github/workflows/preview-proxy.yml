@@ -121,6 +121,13 @@ jobs:
           message-id: preview-run-info
           message-path: |
             comment.md
+      - name: Wait for preview-run to exit
+        uses: lewagon/wait-on-check-action@v1.3.1
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'preview-run'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
       - name: Cleanup cloudflare tunnel
         if: ${{ always() }}
         run: |
