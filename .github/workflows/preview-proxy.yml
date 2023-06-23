@@ -16,7 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  preview-comment:
+  preview-proxy:
     if: ${{ github.event.label.name == 'preview' || contains(github.event.pull_request.labels.*.name, 'preview') }}
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +77,7 @@ jobs:
           cat <<EOF > ~/.cloudflared/config.yml
           url: http://localhost:9090
           tunnel: $TUNNEL_ID
-          credentials-file: /root/.cloudflared/$TUNNEL_ID.json
+          credentials-file: $HOME/.cloudflared/$TUNNEL_ID.json
           EOF
           
           cloudflared tunnel route dns $TUNNEL_ID kluctl-preview-${{ github.event.pull_request.number }}.kluctl.com
