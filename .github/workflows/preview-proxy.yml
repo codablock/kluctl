@@ -128,8 +128,8 @@ jobs:
           cloudflared tunnel delete $TUNNEL_ID
           
           token="${{ secrets.CLOUDFLARE_DNS_API_TOKEN }}"
-          zone_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones" | jq '.result[] | select(.name == "kluctl.com")')
-          record_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records" | jq '.result[] | select(.name == "${{ github.event.pull_request.number }}.kluctl.com")')
+          zone_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones" | jq '.result[] | select(.name == "kluctl.com")' -r)
+          record_id=$(curl -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records" | jq '.result[] | select(.name == "${{ github.event.pull_request.number }}.kluctl.com")' -r)
           curl -X DELETE -H "Authorization: Bearer $token" "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id"
       - uses: mshick/add-pr-comment@v2
         if: ${{ always() }}
