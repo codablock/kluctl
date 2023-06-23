@@ -35,6 +35,7 @@ spec:
           - kluctl
           - webui
           - --in-cluster
+          - --address :8080
         args: {{ get_var(["args.webui_args", "webui_args"], []) | to_json }}
         env: {{ get_var(["args.webui_envs", "webui_envs"], []) | to_json }}
         ports:
